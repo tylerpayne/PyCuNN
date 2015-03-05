@@ -45,10 +45,12 @@ class rnn(object):
 			size = (1,self.layers[1])
 		))
 
+		self.inputs = []
+
 		self.forget()
 
 	def forward(self,x):
-		self.input = x
+		self.inputs.append(x)
 		self.h = cm.sigmoid(cm.dot(x,self.w1).add(self.b1).add_dot(self.hs[-1],self.wr).add(self.br))
 		logits = cm.exp(cm.dot(self.h,self.w2).add(self.b2))
 		self.output = logits.mult_by_col(cm.pow(cm.sum(logits,axis=1),-1))
@@ -56,28 +58,27 @@ class rnn(object):
 		self.outputs.append(self.output)
 		return self.output
 
-	def backward(self,t):
-
-		assert t.shape[0] is self.input.shape[0], "Ensure Same Batch Size as Forward Pass"
-
+	def bptt(self,t):
+		
 		self.outputs[-1].subtract(t,target=self.gOutput)
-		self.gw2.add_dot(self.hs[-2].T,self.gOutput)
+		self.gw2.add_dot(self.hs[-1].T,self.gOutput)
 		self.gb2.add_sums(self.gOutput,axis = 0)
 		
-		self.delta = cm.dot(self.gOutput,self.w2.T).add_dot(self.deltas[-1],self.wr)
-		cl.mult_by_sigmoid_deriv(self.delta,self.hs[-2])
+		self.delta = cm.dot(self.gOutput,self.w2.T)
+		cl.mult_by_sigmoid_deriv(self.delta,self.hs[-1])
 
-		self.gwr.add_dot(self.hs[-1].T,self.delta)
-		self.gbr.add_sums(self.delta,axis=0)
+		for _ in range(5):
+			self.deltas.append(self.delta)
+			self.gwr.add_dot(self.hs[-2].T,self.deltas[-1])
+			self.gbr.add_sums(self.delta,axis=0)
 
-		self.gw1.add_dot(self.input.T,self.delta)
-		self.gb1.add_sums(self.delta,axis = 0)
+			self.gw1.add_dot(self.inputs[-1].T,self.delta)
+			self.gb1.add_sums(self.delta,axis = 0)
 
-		self.deltas.append(self.delta)
-		self.gOutput = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
-		self.delta = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.outputs.pop()
-		self.hs.pop()
+			self.delta = cm.dot(self.delta,self.wr.T)
+
+			self.hs.pop()
+			self.inputs.pop()
 
 	def updateWeights(self):
 		self.w2.subtract(self.gw2.mult(0.01))
@@ -99,13 +100,10 @@ class rnn(object):
 			print('Epoch:',epoch+1)
 			for batch in range(ds.shape[1]/batch_size):
 				x = ds_x[batch*batch_size:(batch+1)*batch_size]
-				y = ds_t[batch*batch_size:(batch+1)*batch_size]
+				y = ds_t[(batch+1)*batch_size]
 				for t in range(x.shape[0]):
 					self.forward(x[t])
-				self.hs.append(cm.CUDAMatrix(np.zeros([1,self.layers[1]])))
-				for t in range(y.shape[0]-1,0,-1):
-					self.backward(y[t])
-				
+				self.bptt(y)
 				self.updateWeights()
 				
 
@@ -125,7 +123,8 @@ class rnn(object):
 		self.outputs = []
 		self.h = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
 		self.hs = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
-		self.deltas = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
+		self.deltas = []
+		self.inputs=[]
 
 
 import timeit
@@ -133,8 +132,10 @@ from sklearn import preprocessing as prepro
 
 
 ds = []
+print('Loading Text')
 with open('./siddhartha.txt') as doc:
-	text = list(doc.read())
+	text = doc.read().split(" ")
+print('Building Dataset')
 enc = prepro.LabelBinarizer()
 enc.fit(text)
 for x in range(len(text)-1):
@@ -148,7 +149,8 @@ n_tokens = enc.classes_.shape[0]
 net = rnn([n_tokens,800,n_tokens])
 
 start = timeit.timeit()
-net.train(ds,50,batch_size=20)
+print('Starting Training')
+net.train(ds,10,batch_size=5)
 print('Time:',start)
 
 net.forget()
