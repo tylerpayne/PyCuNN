@@ -1,6 +1,8 @@
 import numpy as np 
 import cudamat as cm 
 from cudamat import learn as cl
+import timeit
+from sklearn import preprocessing as prepro
 
 cm.cublas_init()
 
@@ -46,7 +48,6 @@ class rnn(object):
 		))
 
 		self.inputs = []
-
 		self.forget()
 
 	def forward(self,x):
@@ -59,7 +60,6 @@ class rnn(object):
 		return self.output
 
 	def bptt(self,t):
-		
 		self.outputs[-1].subtract(t,target=self.gOutput)
 		self.gw2.add_dot(self.hs[-1].T,self.gOutput)
 		self.gb2.add_sums(self.gOutput,axis = 0)
@@ -68,14 +68,14 @@ class rnn(object):
 		cl.mult_by_sigmoid_deriv(self.delta,self.hs[-1])
 
 		for _ in range(5):
-			self.deltas.append(self.delta)
-			self.gwr.add_dot(self.hs[-2].T,self.deltas[-1])
+			self.gwr.add_dot(self.hs[-2].T,self.delta)
 			self.gbr.add_sums(self.delta,axis=0)
 
 			self.gw1.add_dot(self.inputs[-1].T,self.delta)
 			self.gb1.add_sums(self.delta,axis = 0)
 
 			self.delta = cm.dot(self.delta,self.wr.T)
+			cl.mult_by_sigmoid_deriv(self.delta,self.hs[-2])
 
 			self.hs.pop()
 			self.inputs.pop()
@@ -89,8 +89,7 @@ class rnn(object):
 		self.br.subtract(self.gbr.mult(0.01))
 		self.forget()
 
-	def train(self,ds,epochs,batch_size=None):
-
+	def train(self,ds,epochs,enc,batch_size=None):
 		if batch_size == None:
 			batch_size = ds.shape[1]
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
@@ -100,12 +99,14 @@ class rnn(object):
 			print('Epoch:',epoch+1)
 			for batch in range(ds.shape[1]/batch_size):
 				x = ds_x[batch*batch_size:(batch+1)*batch_size]
-				y = ds_t[(batch+1)*batch_size]
+				d = ds_t[(batch+1)*batch_size]
 				for t in range(x.shape[0]):
 					self.forward(x[t])
-				self.bptt(y)
-				self.updateWeights()
+					print('Word ',t,':',enc.inverse_transform(x[-1].asarray()))
 				
+				print('Target',enc.inverse_transform(d.asarray()))
+				self.bptt(d)
+				self.updateWeights()
 
 	def reset_grads(self):
 		self.gw1 = cm.CUDAMatrix(np.zeros([self.layers[0],self.layers[1]]))
@@ -123,25 +124,19 @@ class rnn(object):
 		self.outputs = []
 		self.h = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
 		self.hs = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
-		self.deltas = []
 		self.inputs=[]
-
-
-import timeit
-from sklearn import preprocessing as prepro
-
 
 ds = []
 print('Loading Text')
-with open('./siddhartha.txt') as doc:
+with open('./ptb.train.txt') as doc:
 	text = doc.read().split(" ")
 print('Building Dataset')
 enc = prepro.LabelBinarizer()
 enc.fit(text)
 for x in range(len(text)-1):
-	 i = cm.CUDAMatrix(enc.transform([text[x]]))
-	 t = cm.CUDAMatrix(enc.transform([text[x+1]]))
-	 ds.append([i,t])
+	i = cm.CUDAMatrix(enc.transform([text[x]]))
+ 	t = cm.CUDAMatrix(enc.transform([text[x+1]]))
+ 	ds.append([i,t])
 
 ds = np.array([ds])
 
@@ -150,7 +145,7 @@ net = rnn([n_tokens,800,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,10,batch_size=5)
+net.train(ds,10,enc,batch_size=20)
 print('Time:',start)
 
 net.forget()
@@ -165,9 +160,3 @@ for x in seq:
 	sent.append(enc.inverse_transform(x.asarray()))
 
 print(sent)
-
-			
-
-
-
-
