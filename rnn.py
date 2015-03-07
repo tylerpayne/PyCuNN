@@ -151,7 +151,7 @@ class rnn(object):
 
 ds = []
 print('Loading Text')
-with open('./siddhartha.txt') as doc:
+with open('./ptb.train.txt') as doc:
 	text = doc.read().split(" ")
 print('Building Dataset')
 enc = prepro.LabelBinarizer()
