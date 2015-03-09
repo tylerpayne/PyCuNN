@@ -2,6 +2,8 @@ import cudamat as cm
 from cudamat import learn as cl
 import numpy as np
 import copy
+from sklearn import preprocessing as prepro
+import timeit
 
 cm.cublas_init()
 
@@ -23,50 +25,102 @@ class lstm(object):
 
 		#Hidden to Output Weights
 
-		self.h_y_weight = cm.CUDAMatrix(np.random.uniform(
+		self.w2 = cm.CUDAMatrix(np.random.uniform(
 			low=-np.sqrt(6. / (self.layers[1] + self.layers[2])),
 			high=np.sqrt(6. / (self.layers[1] + self.layers[2])),
 			size = (self.layers[1],self.layers[2])
 		))
 
-		self.h_y_bias = cm.CUDAMatrix(np.random.uniform(
+		self.b2= cm.CUDAMatrix(np.random.uniform(
 			low=-np.sqrt(6. / (self.layers[1] + self.layers[2])),
 			high=np.sqrt(6. / (self.layers[1] + self.layers[2])),
 			size = (1,self.layers[2])
 		))
 
-		self.reset_grads()
+		self.forget()
 
 	def forward(self,x):
-		logits = cm.exp(cm.dot(self.hidden_layer.forward(x),self.h_y_weight).add(self.h_y_bias))
-		output = logits.mult_by_col(cm.pow(cm.sum(logits,axis=1),-1)) 
-		self.step = self.step + 1
-		self.outputs.insert(0,output)
-		return output
+		self.h = self.hidden_layer.forward(x)
+		logits = cm.exp(cm.dot(self.h,self.w2).add(self.b2))
+		self.output = logits.mult_by_col(cm.pow(cm.sum(logits,axis=1),-1))
+		self.inputs.append(x)
+		self.hs.append(self.h)
+		self.outputs.append(self.output)
+		return self.output
 
-	def backward(self,target):
-		self.reset_grads()
-		self.outputs[0].subtract(target)
-		self.h_y_gweight.add_dot(self.hidden_layer.output.T,self.outputs[0])
-		self.h_y_gbias.subtract(self.outputs[0]) 
+	def bptt(self,t):
+		self.outputs[-1].subtract(t[-1],target=self.gOutput)
+		self.gw2.add_dot(self.hidden_layer.prev_outputs[-1].T,self.gOutput)
+		self.gb2.add_sums(self.gOutput,axis=0)
 
-		#self.hidden_layer.backward(cm.dot(self.outputs[0],self.h_y_weight.T))
+		self.delta = cm.dot(self.gOutput,self.w2.T)
 
-		self.h_y_weight.subtract(self.h_y_gweight.mult(0.01)) 
-		self.h_y_bias.subtract(self.h_y_gbias.mult(0.01))
+		self.hidden_layer.backward(self.delta)
 
-		#LSTM
-		#rnn['hidden'].output = 
+		for _ in range(10):
+			self.outputs[-2].subtract(t[-2],target=self.gOutput)
+			self.gw2.add_dot(self.hidden_layer.prev_outputs[-2].T,self.gOutput)
+			self.gb2.add_sums(self.gOutput,axis=0)
 
-	def forget(self):
-		self.step = 0
-		self.outputs = []
-		self.hidden_layer.forget()
-		self.reset_grads()
+			self.delta = cm.dot(self.gOutput,self.w2.T)
+
+			self.hidden_layer.backward(self.delta)
+
+			self.outputs.pop()
+			self.hs.pop()
+			self.inputs.pop()
+			t = np.delete(t,t.shape[0]-1)
+
+
+	def updateWeights(self):
+		self.w2.subtract(self.gw2.mult(self.lr))
+		self.b2.subtract(self.gb2.mult(self.lr))
+		self.hidden_layer.updateWeights(self.lr)
+		self.forget()
+
+	def train(self,ds,epochs,enc,seq_len=10,batch_size=1,lr=0.02,decay=0.99):
+		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
+		ds_x = ds[:,:,0][0]
+		ds_t = ds[:,:,1][0]
+		self.lr = lr/batch_size
+		err = []
+		for epoch in range(epochs):
+			print('Epoch:',epoch+1)
+			seq_len = int(np.random.uniform(low=70,high=100,size=(1))[0])
+			#print(seq_len)
+			for seq in range(ds.shape[1]/seq_len):
+				x = ds_x[seq*seq_len:(seq+1)*seq_len]
+				d = ds_t[seq*seq_len:(seq+1)*seq_len]
+				for t in range(x.shape[0]):
+					self.forward(x[t])
+				self.bptt(d)
+				if seq % batch_size == 0:
+					#print('Output:',enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1].asarray()),'Target',enc.inverse_transform(d[-1].asarray()))
+					self.updateWeights()
+					#self.lr = self.lr * decay
+				self.reset_activations()
+
 
 	def reset_grads(self):
-		self.h_y_gbias = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
-		self.h_y_gweight = cm.CUDAMatrix(np.zeros([self.layers[1],self.layers[2]]))
+		self.gw1 = cm.CUDAMatrix(np.zeros([self.layers[0],self.layers[1]]))
+		self.gw2 = cm.CUDAMatrix(np.zeros([self.layers[1],self.layers[2]]))
+		self.gb1 = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		self.gb2 = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
+		self.gOutput = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
+		self.delta = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+
+	def reset_activations(self):
+		self.output = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
+		self.outputs = []
+		self.h = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		self.hs = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
+		self.inputs=[]
+		self.hidden_layer.reset_activations()
+
+	def forget(self):
+		self.reset_grads()
+		self.reset_activations()
+		self.hidden_layer.forget()
 
 		
 class lstm_layer(object):
@@ -74,10 +128,6 @@ class lstm_layer(object):
 		super(lstm_layer, self).__init__()
 
 		self.layers = layers
-		self.output = None
-		self.prev_states = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
-		self.prev_outputs =[cm.CUDAMatrix(np.zeros([1,self.layers[1]]))] 
-		self.states = []
 
 		self.i_ig_weight = cm.CUDAMatrix(np.random.uniform(
 			low=-np.sqrt(6. / (self.layers[0] + self.layers[1])),
@@ -152,61 +202,151 @@ class lstm_layer(object):
 			size = (self.layers[1],self.layers[1])
 		))
 
-		self.reset_grads()
-
-		#Losses
-
-		self.do = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.dc = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.df = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.di = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		self.forget()
 
 	def forward(self,x):
-		self.ai = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		ai = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
 		temp = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.prev_states[0].mult(self.c_ig_weight,target=temp)
-		self.ai.add_dot(x,self.i_ig_weight).add_dot(self.prev_outputs[0],self.hm1_ig_weight).add(temp)
-		self.bi = cm.sigmoid(self.ai)
+		self.prev_states[-1].mult(self.c_ig_weight,target=temp)
+		ai.add_dot(x,self.i_ig_weight).add_dot(self.prev_outputs[-1],self.hm1_ig_weight).add(temp)
+		bi = cm.sigmoid(ai)
 
-		self.prev_states[0].mult(self.c_fg_weight,target=temp)
-		self.af = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.af.add_dot(x,self.i_fg_weight).add_dot(self.prev_outputs[0],self.hm1_fg_weight).add(temp)
-		self.bf = cm.sigmoid(self.af)
+		self.prev_states[-1].mult(self.c_fg_weight,target=temp)
+		af = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		af.add_dot(x,self.i_fg_weight).add_dot(self.prev_outputs[-1],self.hm1_fg_weight).add(temp)
+		bf = cm.sigmoid(af)
 
-		self.ac = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.ac.add_dot(x,self.i_c_weight).add_dot(self.prev_outputs[0],self.hm1_c_weight)
-		self.sc = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		ac = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		ac.add_dot(x,self.i_c_weight).add_dot(self.prev_outputs[-1],self.hm1_c_weight)
+		sc = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
 
-		self.bf.mult(self.prev_states[0],target=temp)
-		self.sc.add(temp)
-		self.bi.mult(self.ac,target=temp)
-		self.sc.add(temp)
+		bf.mult(self.prev_states[-1],target=temp)
+		sc.add(temp)
+		bi.mult(cm.sigmoid(ac),target=temp)
+		sc.add(temp)
 
-		self.prev_states[0].mult(self.c_og_weight,target=temp)
-		self.ao = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.ao.add_dot(x,self.i_og_weight).add_dot(self.prev_outputs[0],self.hm1_og_weight).add(temp)
-		self.bo = cm.sigmoid(self.ao)
+		self.prev_states[-1].mult(self.c_og_weight,target=temp)
+		ao = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		ao.add_dot(x,self.i_og_weight).add_dot(self.prev_outputs[-1],self.hm1_og_weight).add(temp)
+		bo = cm.sigmoid(ao)
 
 		self.output = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.bo.mult(cm.sigmoid(self.sc),target=temp)
-		self.output.add(temp)
+		bo.mult(cm.sigmoid(sc),target=self.output)
 
-		self.prev_states.insert(0,self.sc)
-		self.prev_outputs.insert(0,self.output)
+		self.prev_states.append(sc)
+		self.prev_outputs.append(self.output)
+		self.inputs.append(x)
+		self.prev_ac.append(ac)
+		self.prev_ao.append(ao)
+		self.prev_bf.append(bf)
+		self.prev_af.append(af)
+		self.prev_ai.append(ai)
+		self.prev_bi.append(bi)
+		self.prev_bo.append(bo)
 
 		return self.output
 
 	def backward(self,grad):
-		self.prev_outputs[-1] = cm.CUDAMatrix(np.zeros(self.prev_outputs[-1].shape))
-		self.prev_outputs[-1].add(grad).add(cm.dot(self.do,self.c_og_weight)).add(cm.dot(self.dc,self.i_c_weight)).add(cm.dot(self.df,self.c_fg_weight)).add(cm.dot(self.di,self.c_ig_weight))
-		self.ao.mult(-1,target=self.do).add(1,target=self.do)
-		self.do.mult(self.ao).mult(cm.sigmoid(self.prev_states[-1]).mult(self.prev_outputs[-1]))
-		#self.
+		ec = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		ec.add(grad)
+
+		go = cm.CUDAMatrix(np.ones([1,self.layers[1]])) 
+		cl.mult_by_sigmoid_deriv(go,self.prev_ao[-1])
+		go.mult(cm.sigmoid(self.prev_states[-1]).mult(ec))
+
+		es = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		cl.mult_by_sigmoid_deriv(es,self.prev_states[-1])
+		es.mult(self.prev_bo[-1]).mult(ec).add(self.prev_bf[-1].mult(self.prev_es[-1])).add(self.prev_gi[-1].mult(self.c_ig_weight)).add(self.prev_gf[-1].mult(self.c_fg_weight)).add(go.mult(self.c_og_weight))
+
+		gc = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		cl.mult_by_sigmoid_deriv(gc,self.prev_ac[-1])
+		gc.mult(self.prev_bi[-1]).mult(es)
+
+		gf = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		cl.mult_by_sigmoid_deriv(gf,self.prev_af[-2])
+		gf.mult(self.prev_states[-2].mult(es))
+
+		gi = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		cl.mult_by_sigmoid_deriv(gi,self.prev_ai[-1])
+		gi.mult(cm.sigmoid(self.prev_ac[-1]).mult(es))
+
+		#Accumulate Gradients
+
+		self.i_c_gweight.add_dot(self.inputs[-1].T,gc)
+		self.hm1_c_gweight.add_dot(self.prev_outputs[-1].T,gc)
+
+		self.i_ig_gweight.add_dot(self.inputs[-1].T,gi)
+		self.hm1_ig_gweight.add_dot(self.prev_outputs[-1].T,gi)
+
+		self.i_fg_gweight.add_dot(self.inputs[-1].T,gf)
+		self.hm1_fg_gweight.add_dot(self.prev_outputs[-1].T,gf)
+
+		self.i_og_gweight.add_dot(self.inputs[-1].T,go)
+		self.hm1_og_gweight.add_dot(self.prev_outputs[-1].T,go)
+
+		temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		temp.mult(gi).mult(self.prev_states[-1])
+		self.c_ig_gweight.add(temp)
+
+		temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		temp.mult(gf).mult(self.prev_states[-1])
+		self.c_fg_gweight.add(temp)
+
+		temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		temp.mult(go).mult(self.prev_states[-1])
+		self.c_og_gweight.add(temp)
+
+
+		self.prev_ec.append(ec)
+		self.prev_es.append(es)
+		self.prev_go.append(go)
+		self.prev_gc.append(gc)
+		self.prev_gf.append(gf)
+		self.prev_gi.append(gi)
+		self.prev_outputs.pop()
+		self.inputs.pop()
+		self.prev_states.pop()
+
+
+	def updateWeights(self, lr):
+		self.i_og_weight.subtract(self.i_og_gweight.mult(lr))
+		self.hm1_og_weight.subtract(self.hm1_og_gweight.mult(lr))
+		self.c_og_weight.subtract(self.c_og_gweight.mult(lr))
+
+		self.i_fg_weight.subtract(self.i_fg_gweight.mult(lr))
+		self.hm1_fg_weight.subtract(self.hm1_fg_gweight.mult(lr))
+		self.c_fg_weight.subtract(self.c_fg_gweight.mult(lr))
+
+		self.i_ig_weight.subtract(self.i_ig_gweight.mult(lr))
+		self.hm1_ig_weight.subtract(self.hm1_ig_gweight.mult(lr))
+		self.c_ig_weight.subtract(self.c_ig_gweight.mult(lr))
+
+		self.i_c_weight.subtract(self.i_c_gweight.mult(lr))
+		self.hm1_c_weight.subtract(self.hm1_c_gweight.mult(lr))		
 
 	def forget(self):
+		self.reset_activations()
+		self.reset_grads()
+
+	def reset_activations(self):
 		self.prev_states = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
 		self.prev_outputs =[cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
-		self.reset_grads()
+		self.inputs = []
+
+		self.prev_ac = []
+		self.prev_bo = []
+		self.prev_ao = []
+		self.prev_bf = []
+		self.prev_af = []
+		self.prev_ai = []
+		self.prev_bi = []
+
+		self.prev_ec = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
+		self.prev_es = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
+		self.prev_go = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
+		self.prev_gc = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
+		self.prev_gf = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
+		self.prev_gi = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
 
 	def reset_grads(self):
 
@@ -222,6 +362,40 @@ class lstm_layer(object):
 		self.hm1_ig_gweight = cm.CUDAMatrix(np.zeros([self.layers[1],self.layers[1]]))
 		self.i_ig_gweight = cm.CUDAMatrix(np.zeros([self.layers[0],self.layers[1]]))
 		
+
+ds = []
+print('Loading Text')
+with open('./siddhartha.txt') as doc:
+	text = doc.read().split(" ")
+print('Building Dataset')
+enc = prepro.LabelBinarizer()
+enc.fit(text)
+for x in range(len(text)-1):
+	i = cm.CUDAMatrix(enc.transform([text[x]]))
+ 	t = cm.CUDAMatrix(enc.transform([text[x+1]]))
+ 	ds.append([i,t])
+
+ds = np.array([ds])
+
+n_tokens = enc.classes_.shape[0]
+net = lstm([n_tokens,1000,n_tokens])
+
+start = timeit.timeit()
+print('Starting Training')
+net.train(ds,10,enc)
+print('Time:',start)
+
+net.forget()
+seq = [ds[0][0][0]]
+
+for i in range(30):
+	seq.append(net.forward(seq[-1]))
+
+sent = []
+for x in seq:
+	sent.append(enc.inverse_transform(x.asarray()))
+
+print(sent)
 
 
 
