@@ -382,7 +382,7 @@ net = lstm([n_tokens,1000,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,10,enc)
+net.train(ds,50,enc)
 print('Time:',start)
 
 net.forget()
