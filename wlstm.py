@@ -1,5 +1,4 @@
-
-import cudamat as cm 
+import cudamat as cm
 from cudamat import learn as cl
 import numpy as np
 import copy
@@ -69,7 +68,7 @@ class lstm(object):
 		self.hidden_layer.updateWeights(self.lr)
 		self.forget()
 
-	def train(self,ds,epochs,enc,seq_len=10,batch_size=1,lr=0.01,decay=0.999):
+	def train(self,ds,epochs,enc,seq_len=45,batch_size=1,lr=0.01,decay=0.999):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		ds_x = ds[:,:,0][0]
 		ds_t = ds[:,:,1][0]
@@ -77,7 +76,7 @@ class lstm(object):
 		err = []
 		for epoch in range(epochs):
 			print('Epoch:',epoch+1)
-			seq_len = int(np.random.uniform(low=45,high=100,size=(1))[0])
+			#seq_len = int(np.random.uniform(low=45,high=100,size=(1))[0])
 			#print(seq_len)
 			for seq in range(ds.shape[1]/seq_len):
 				x = ds_x[seq*seq_len:(seq+1)*seq_len]
@@ -86,7 +85,7 @@ class lstm(object):
 					self.forward(x[t])
 				self.bptt(d)
 				if seq % batch_size == 0:
-					print('Output:',enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1].asarray()),'Target',enc.inverse_transform(d[-1].asarray()))
+					#print('Output:',enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1].asarray()),'Target',enc.inverse_transform(d[-1].asarray()))
 					self.updateWeights()
 					self.lr = self.lr * decay
 				self.reset_activations()
@@ -197,13 +196,13 @@ class lstm_layer(object):
 
 	def forward(self,x):
 		temp = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.prev_states[-1].mult(self.c_ig_weight,target=temp)
-		ai = cm.dot(x,self.i_ig_weight).add_dot(self.prev_outputs[-1],self.hm1_ig_weight).add(temp)
+		#self.prev_states[-1].mult(self.c_ig_weight,target=temp)
+		ai = cm.dot(x,self.i_ig_weight).add_dot(self.prev_outputs[-1],self.hm1_ig_weight)#.add(temp)
 		bi = cm.sigmoid(ai)
 
 		temp = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.prev_states[-1].mult(self.c_fg_weight,target=temp)
-		af = cm.dot(x,self.i_fg_weight).add_dot(self.prev_outputs[-1],self.hm1_fg_weight).add(temp)
+		#self.prev_states[-1].mult(self.c_fg_weight,target=temp)
+		af = cm.dot(x,self.i_fg_weight).add_dot(self.prev_outputs[-1],self.hm1_fg_weight)#.add(temp)
 		bf = cm.sigmoid(af)
 
 		ac = cm.dot(x,self.i_c_weight).add_dot(self.prev_outputs[-1],self.hm1_c_weight)
@@ -217,8 +216,8 @@ class lstm_layer(object):
 		sc.add(temp)
 
 		temp = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.prev_states[-1].mult(self.c_og_weight,target=temp)
-		ao = cm.dot(x,self.i_og_weight).add_dot(self.prev_outputs[-1],self.hm1_og_weight).add(temp)
+		#self.prev_states[-1].mult(self.c_og_weight,target=temp)
+		ao = cm.dot(x,self.i_og_weight).add_dot(self.prev_outputs[-1],self.hm1_og_weight)#.add(temp)
 		bo = cm.sigmoid(ao)
 
 		self.output = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
@@ -279,17 +278,17 @@ class lstm_layer(object):
 		self.i_og_gweight.add_dot(self.inputs[-1].T,go)
 		self.hm1_og_gweight.add_dot(self.prev_outputs[-1].T,go)
 
-		temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
-		temp.mult(gi).mult(self.prev_states[-1])
-		self.c_ig_gweight.add(temp)
+		#temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		#temp.mult(gi).mult(self.prev_states[-1])
+		#self.c_ig_gweight.add(temp)
 
-		temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
-		temp.mult(gf).mult(self.prev_states[-1])
-		self.c_fg_gweight.add(temp)
+		#temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		#temp.mult(gf).mult(self.prev_states[-1])
+		#self.c_fg_gweight.add(temp)
 
-		temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
-		temp.mult(go).mult(self.prev_states[-1])
-		self.c_og_gweight.add(temp)
+		#temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		#temp.mult(go).mult(self.prev_states[-1])
+		#self.c_og_gweight.add(temp)
 
 
 		self.prev_ec.append(ec)
@@ -307,15 +306,15 @@ class lstm_layer(object):
 	def updateWeights(self, lr):
 		self.i_og_weight.subtract(self.i_og_gweight.mult(lr))
 		self.hm1_og_weight.subtract(self.hm1_og_gweight.mult(lr))
-		self.c_og_weight.subtract(self.c_og_gweight.mult(lr))
+		#self.c_og_weight.subtract(self.c_og_gweight.mult(lr))
 
 		self.i_fg_weight.subtract(self.i_fg_gweight.mult(lr))
 		self.hm1_fg_weight.subtract(self.hm1_fg_gweight.mult(lr))
-		self.c_fg_weight.subtract(self.c_fg_gweight.mult(lr))
+		#self.c_fg_weight.subtract(self.c_fg_gweight.mult(lr))
 
 		self.i_ig_weight.subtract(self.i_ig_gweight.mult(lr))
 		self.hm1_ig_weight.subtract(self.hm1_ig_gweight.mult(lr))
-		self.c_ig_weight.subtract(self.c_ig_gweight.mult(lr))
+		#self.c_ig_weight.subtract(self.c_ig_gweight.mult(lr))
 
 		self.i_c_weight.subtract(self.i_c_gweight.mult(lr))
 		self.hm1_c_weight.subtract(self.hm1_c_gweight.mult(lr))		
