@@ -76,7 +76,7 @@ class lstm(object):
 		err = []
 		for epoch in range(epochs):
 			print('Epoch:',epoch+1)
-			seq_len = int(np.random.uniform(low=45,high=100,size=(1))[0])
+			#seq_len = int(np.random.uniform(low=45,high=100,size=(1))[0])
 			#print(seq_len)
 			for seq in range(ds.shape[1]/seq_len):
 				x = ds_x[seq*seq_len:(seq+1)*seq_len]
@@ -238,7 +238,7 @@ class lstm_layer(object):
 
 	def backward(self,grad):
 		inSum = cm.dot(self.prev_gc[-1],self.hm1_c_weight.T).add_dot(self.prev_gi[-1],self.hm1_ig_weight.T).add_dot(self.prev_gf[-1],self.hm1_fg_weight.T).add_dot(self.prev_go[-1],self.hm1_og_weight.T)
-		inSum.add_dot(self.prev_gradInput[-1],self.i_c_weight).add_dot(self.prev_gradInput[-1],self.i_ig_weight).add_dot(self.prev_gradInput[-1],self.i_fg_weight).add_dot(self.prev_gradInput[-1],self.i_og_weight)
+		#inSum.add_dot(self.prev_gradInput[-1],self.i_c_weight).add_dot(self.prev_gradInput[-1],self.i_ig_weight).add_dot(self.prev_gradInput[-1],self.i_fg_weight).add_dot(self.prev_gradInput[-1],self.i_og_weight)
 		ec = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
 		ec.add(grad).add(inSum)
 
@@ -264,7 +264,7 @@ class lstm_layer(object):
 
 		#Accumulate Gradients
 
-		gradInput = cm.dot(self.prev_gc[-1],self.i_c_weight.T).add_dot(self.prev_gi[-1],self.i_ig_weight.T).add_dot(self.prev_gf[-1],self.i_fg_weight.T).add_dot(self.prev_go[-1],self.i_og_weight.T)
+		#gradInput = cm.dot(self.prev_gc[-1],self.i_c_weight.T).add_dot(self.prev_gi[-1],self.i_ig_weight.T).add_dot(self.prev_gf[-1],self.i_fg_weight.T).add_dot(self.prev_go[-1],self.i_og_weight.T)
 		
 		self.i_c_gweight.add_dot(self.inputs[-1].T,gc)
 		self.hm1_c_gweight.add_dot(self.prev_outputs[-1].T,gc)
