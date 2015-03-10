@@ -76,7 +76,7 @@ class lstm(object):
 		err = []
 		for epoch in range(epochs):
 			print('Epoch:',epoch+1)
-			#seq_len = int(np.random.uniform(low=45,high=100,size=(1))[0])
+			seq_len = int(np.random.uniform(low=45,high=100,size=(1))[0])
 			#print(seq_len)
 			for seq in range(ds.shape[1]/seq_len):
 				x = ds_x[seq*seq_len:(seq+1)*seq_len]
@@ -85,7 +85,7 @@ class lstm(object):
 					self.forward(x[t])
 				self.bptt(d)
 				if seq % batch_size == 0:
-					#print('Output:',enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1].asarray()),'Target',enc.inverse_transform(d[-1].asarray()))
+					print('Output:',enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1].asarray()),'Target',enc.inverse_transform(d[-1].asarray()))
 					self.updateWeights()
 					self.lr = self.lr * decay
 				self.reset_activations()
@@ -382,7 +382,7 @@ net.train(ds,3,enc)
 print('Time:',start)
 
 net.forget()
-seq = [enc.inverse_transform(ds[0][15][0].asarray())]
+seq = [enc.inverse_transform(ds[0][13][0].asarray())]
 for i in range(30):
 	x = cm.CUDAMatrix(enc.transform([seq[-1]]))
 	y = net.forward(x)
