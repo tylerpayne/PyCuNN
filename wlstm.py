@@ -297,7 +297,7 @@ class lstm_layer(object):
 		self.prev_gc.append(gc)
 		self.prev_gf.append(gf)
 		self.prev_gi.append(gi)
-		self.prev_gradInput.append(gradInput)
+		#self.prev_gradInput.append(gradInput)
 		self.prev_outputs.pop()
 		self.inputs.pop()
 		self.prev_states.pop()
