@@ -63,8 +63,8 @@ class lstm(object):
 			t = np.delete(t,t.shape[0]-1)
 
 	def updateWeights(self):
-		self.w2.subtract(self.gw2.mult(self.lr))
-		self.b2.subtract(self.gb2.mult(self.lr))
+		#self.w2.subtract(self.gw2.mult(self.lr))
+		#self.b2.subtract(self.gb2.mult(self.lr))
 		self.hidden_layer.updateWeights(self.lr)
 		self.forget()
 
@@ -378,11 +378,11 @@ net = lstm([n_tokens,1000,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,3,enc)
+net.train(ds,1,enc)
 print('Time:',start)
 
 net.forget()
-seq = [enc.inverse_transform(ds[0][13][0].asarray())]
+seq = [enc.inverse_transform(ds[0][12][0].asarray())]
 for i in range(30):
 	x = cm.CUDAMatrix(enc.transform([seq[-1]]))
 	y = net.forward(x)
