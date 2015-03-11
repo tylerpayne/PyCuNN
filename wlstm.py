@@ -266,17 +266,17 @@ class lstm_layer(object):
 
 		#gradInput = cm.dot(self.prev_gc[-1],self.i_c_weight.T).add_dot(self.prev_gi[-1],self.i_ig_weight.T).add_dot(self.prev_gf[-1],self.i_fg_weight.T).add_dot(self.prev_go[-1],self.i_og_weight.T)
 		
-		self.i_c_gweight.add_dot(self.inputs[-1].T,gc)
-		self.hm1_c_gweight.add_dot(self.prev_outputs[-1].T,gc)
+		print(self.i_c_gweight.add_dot(self.inputs[-1].T,gc).asarray())
+		print(self.hm1_c_gweight.add_dot(self.prev_outputs[-1].T,gc).asarray())
 
-		self.i_ig_gweight.add_dot(self.inputs[-1].T,gi)
-		self.hm1_ig_gweight.add_dot(self.prev_outputs[-1].T,gi)
+		print(self.i_ig_gweight.add_dot(self.inputs[-1].T,gi).asarray())
+		print(self.hm1_ig_gweight.add_dot(self.prev_outputs[-1].T,gi).asarray())
 
-		self.i_fg_gweight.add_dot(self.inputs[-1].T,gf)
-		self.hm1_fg_gweight.add_dot(self.prev_outputs[-1].T,gf)
+		print(self.i_fg_gweight.add_dot(self.inputs[-1].T,gf).asarray())
+		print(self.hm1_fg_gweight.add_dot(self.prev_outputs[-1].T,gf).asarray())
 
-		self.i_og_gweight.add_dot(self.inputs[-1].T,go)
-		self.hm1_og_gweight.add_dot(self.prev_outputs[-1].T,go)
+		print(self.i_og_gweight.add_dot(self.inputs[-1].T,go).asarray())
+		print(self.hm1_og_gweight.add_dot(self.prev_outputs[-1].T,go).asarray())
 
 		#temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
 		#temp.mult(gi).mult(self.prev_states[-1])
@@ -378,7 +378,7 @@ net = lstm([n_tokens,1000,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,1,enc)
+net.train(ds,3,enc)
 print('Time:',start)
 
 net.forget()
