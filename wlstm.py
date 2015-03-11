@@ -250,7 +250,7 @@ class lstm_layer(object):
 	def backward(self,grad,t):
 		#Backpropogate Gradients from Gates at t+1 through Recurrent Weights to Block Output
 		recurrentGrad = cm.dot(self.prev_gc[-1],self.hm1_c_weight.T).add_dot(self.prev_gi[-1],self.hm1_ig_weight.T).add_dot(self.prev_gf[-1],self.hm1_fg_weight.T).add_dot(self.prev_go[-1],self.hm1_og_weight.T)
-		inputGrad = cm.dot(self.prev_gradInput[-1],self.i_c_weight.T).add_dot(self.prev_gradInput[-1],self.i_ig_weight.T).add_dot(self.prev_gradInput[-1],self.i_fg_weight.T).add_dot(self.prev_gradInput[-1],self.i_og_weight.T)
+		#inputGrad = cm.dot(self.prev_gradInput[-1],self.i_c_weight.T).add_dot(self.prev_gradInput[-1],self.i_ig_weight.T).add_dot(self.prev_gradInput[-1],self.i_fg_weight.T).add_dot(self.prev_gradInput[-1],self.i_og_weight.T)
 		#Gradient at Outputs
 		ec = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
 		ec.add(grad).add(recurrentGrad).add(inputGrad)
@@ -278,7 +278,7 @@ class lstm_layer(object):
 
 		#Accumulate Gradients
 
-		gradInput = cm.dot(self.prev_gc[-1],self.i_c_weight.T).add_dot(self.prev_gi[-1],self.i_ig_weight.T).add_dot(self.prev_gf[-1],self.i_fg_weight.T).add_dot(self.prev_go[-1],self.i_og_weight.T)
+		#gradInput = cm.dot(self.prev_gc[-1],self.i_c_weight.T).add_dot(self.prev_gi[-1],self.i_ig_weight.T).add_dot(self.prev_gf[-1],self.i_fg_weight.T).add_dot(self.prev_go[-1],self.i_og_weight.T)
 		#print('Input',self.inputs[-1].asarray())
 		self.i_c_gweight.add_dot(self.inputs[t].T,gc)
 		self.hm1_c_gweight.add_dot(self.prev_outputs[t].T,gc)
