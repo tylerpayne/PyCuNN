@@ -82,7 +82,7 @@ class lstm(object):
 		err = []
 		for epoch in range(epochs):
 			print('Epoch:',epoch+1)
-			#seq_len = int(np.random.uniform(low=45,high=100,size=(1))[0])
+			seq_len = int(np.random.uniform(low=45,high=100,size=(1))[0])
 			#print(seq_len)
 			for seq in range(ds.shape[1]/seq_len):
 				x = ds_x[seq*seq_len:(seq+1)*seq_len]
