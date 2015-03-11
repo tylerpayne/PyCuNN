@@ -69,8 +69,8 @@ class lstm(object):
 			self.hidden_layer.backward(self.delta,_)
 
 	def updateWeights(self):
-		self.w2.subtract(self.gw2.mult(self.lr))
-		self.b2.subtract(self.gb2.mult(self.lr))
+		#self.w2.subtract(self.gw2.mult(self.lr))
+		#self.b2.subtract(self.gb2.mult(self.lr))
 		self.hidden_layer.updateWeights(self.lr)
 		self.forget()
 
@@ -98,9 +98,7 @@ class lstm(object):
 
 
 	def reset_grads(self):
-		self.gw1 = cm.CUDAMatrix(np.zeros([self.layers[0],self.layers[1]]))
 		self.gw2 = cm.CUDAMatrix(np.zeros([self.layers[1],self.layers[2]]))
-		self.gb1 = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
 		self.gb2 = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
 		self.gOutput = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
 		self.delta = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
@@ -185,7 +183,7 @@ class lstm_layer(object):
 			size = (1,self.layers[1])
 		))
 
-		#Cell Weights Weights
+		#Cell Weights
 
 		self.i_c_weight = cm.CUDAMatrix(np.random.uniform(
 			low=-np.sqrt(6. / (self.layers[0] + self.layers[1])),
@@ -387,7 +385,7 @@ net = lstm([n_tokens,1000,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,20,enc)
+net.train(ds,2,enc)
 print('Time:',start)
 
 net.forget()
