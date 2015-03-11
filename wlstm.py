@@ -51,6 +51,7 @@ class lstm(object):
 		#Set T+1 activations to 0
 		self.hidden_layer.prev_outputs.append(cm.empty(self.hidden_layer.prev_outputs[-1].shape))
 		self.hidden_layer.prev_states.append(cm.empty(self.hidden_layer.prev_states[-1].shape))
+		self.hidden_layer.prev_gradInput.append(cm.empty([1,self.layers[0]]))
 		self.hidden_layer.prev_ac.append(cm.empty(self.hidden_layer.prev_ac[-1].shape))
 		self.hidden_layer.prev_ao.append(cm.empty(self.hidden_layer.prev_ao[-1].shape))
 		self.hidden_layer.prev_af.append(cm.empty(self.hidden_layer.prev_af[-1].shape))
@@ -249,10 +250,10 @@ class lstm_layer(object):
 	def backward(self,grad,t):
 		#Backpropogate Gradients from Gates at t+1 through Recurrent Weights to Block Output
 		recurrentGrad = cm.dot(self.prev_gc[-1],self.hm1_c_weight.T).add_dot(self.prev_gi[-1],self.hm1_ig_weight.T).add_dot(self.prev_gf[-1],self.hm1_fg_weight.T).add_dot(self.prev_go[-1],self.hm1_og_weight.T)
-		
+		inputGrad = cm.dot(self.prev_gradInput[-1],self.i_c_weight.T).add_dot(self.prev_gradInput[-1],self.i_ig_weight.T).add_dot(self.prev_gradInput[-1],self.i_fg_weight.T).add_dot(self.prev_gradInput[-1],self.i_og_weight.T)
 		#Gradient at Outputs
 		ec = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		ec.add(grad).add(recurrentGrad)
+		ec.add(grad).add(recurrentGrad).add(inputGrad)
 
 		#Gradient at Output Gates
 		go = cm.CUDAMatrix(np.ones([1,self.layers[1]])) 
@@ -277,7 +278,7 @@ class lstm_layer(object):
 
 		#Accumulate Gradients
 
-		#gradInput = cm.dot(self.prev_gc[-1],self.i_c_weight.T).add_dot(self.prev_gi[-1],self.i_ig_weight.T).add_dot(self.prev_gf[-1],self.i_fg_weight.T).add_dot(self.prev_go[-1],self.i_og_weight.T)
+		gradInput = cm.dot(self.prev_gc[-1],self.i_c_weight.T).add_dot(self.prev_gi[-1],self.i_ig_weight.T).add_dot(self.prev_gf[-1],self.i_fg_weight.T).add_dot(self.prev_go[-1],self.i_og_weight.T)
 		#print('Input',self.inputs[-1].asarray())
 		self.i_c_gweight.add_dot(self.inputs[t].T,gc)
 		self.hm1_c_gweight.add_dot(self.prev_outputs[t].T,gc)
@@ -309,6 +310,7 @@ class lstm_layer(object):
 		self.prev_gc.append(gc)
 		self.prev_gf.append(gf)
 		self.prev_gi.append(gi)
+		self.prev_gradInput.append(gradInput)
 
 	def updateWeights(self,lr):
 		self.i_og_weight.subtract(self.i_og_gweight)
@@ -349,7 +351,7 @@ class lstm_layer(object):
 		self.prev_gc = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
 		self.prev_gf = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
 		self.prev_gi = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
-		self.prev_gradInput = [cm.CUDAMatrix(np.zeros([1,self.layers[0]]))]
+		self.prev_gradInput = []
 
 	def reset_grads(self):
 
