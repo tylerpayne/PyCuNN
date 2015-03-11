@@ -48,23 +48,29 @@ class lstm(object):
 		return self.output
 
 	def bptt(self,t):
-		for _ in range(t.shape[0]-1):
-			self.outputs[-1].subtract(t[-1],target=self.gOutput)
-			self.gw2.add_dot(self.hidden_layer.prev_outputs[-1].T,self.gOutput)
+		#Set T+1 activations to 0
+		self.hidden_layer.prev_outputs.append(cm.empty(self.hidden_layer.prev_outputs[-1].shape))
+		self.hidden_layer.prev_states.append(cm.empty(self.hidden_layer.prev_states[-1].shape))
+		self.hidden_layer.prev_ac.append(cm.empty(self.hidden_layer.prev_ac[-1].shape))
+		self.hidden_layer.prev_ao.append(cm.empty(self.hidden_layer.prev_ao[-1].shape))
+		self.hidden_layer.prev_af.append(cm.empty(self.hidden_layer.prev_af[-1].shape))
+		self.hidden_layer.prev_ai.append(cm.empty(self.hidden_layer.prev_ai[-1].shape))
+		self.hidden_layer.prev_bf.append(cm.empty(self.hidden_layer.prev_bf[-1].shape))
+		self.hidden_layer.prev_bo.append(cm.empty(self.hidden_layer.prev_bo[-1].shape))
+		self.hidden_layer.prev_bi.append(cm.empty(self.hidden_layer.prev_bi[-1].shape))
+
+		for _ in range(t.shape[0]-1,0,-1):
+			self.outputs[_].subtract(t[_],target=self.gOutput)
+			self.gw2.add_dot(self.hidden_layer.prev_outputs[_].T,self.gOutput)
 			self.gb2.add_sums(self.gOutput,axis=0)
 
 			self.delta = cm.dot(self.gOutput,self.w2.T)
 
-			self.hidden_layer.backward(self.delta)
-
-			self.outputs.pop()
-			self.hs.pop()
-			self.inputs.pop()
-			t = np.delete(t,t.shape[0]-1)
+			self.hidden_layer.backward(self.delta,_)
 
 	def updateWeights(self):
-		#self.w2.subtract(self.gw2.mult(self.lr))
-		#self.b2.subtract(self.gb2.mult(self.lr))
+		self.w2.subtract(self.gw2.mult(self.lr))
+		self.b2.subtract(self.gb2.mult(self.lr))
 		self.hidden_layer.updateWeights(self.lr)
 		self.forget()
 
@@ -119,6 +125,8 @@ class lstm_layer(object):
 
 		self.layers = layers
 
+		#Input Gate Weights
+
 		self.i_ig_weight = cm.CUDAMatrix(np.random.uniform(
 			low=-np.sqrt(6. / (self.layers[0] + self.layers[1])),
 			high=np.sqrt(6. / (self.layers[0] + self.layers[1])),
@@ -137,8 +145,7 @@ class lstm_layer(object):
 			size = (1,self.layers[1])
 		))
 
-
-		#Forget Gate
+		#Forget Gate Weights
 
 		self.i_fg_weight = cm.CUDAMatrix(np.random.uniform(
 			low=-np.sqrt(6. / (self.layers[0] + self.layers[1])),
@@ -158,7 +165,7 @@ class lstm_layer(object):
 			size = (1,self.layers[1])
 		))
 
-		#Output Gate
+		#Output Gate Weights
 
 		self.i_og_weight = cm.CUDAMatrix(np.random.uniform(
 			low=-np.sqrt(6. / (self.layers[0] + self.layers[1])),
@@ -178,7 +185,7 @@ class lstm_layer(object):
 			size = (1,self.layers[1])
 		))
 
-		#Cell Weights
+		#Cell Weights Weights
 
 		self.i_c_weight = cm.CUDAMatrix(np.random.uniform(
 			low=-np.sqrt(6. / (self.layers[0] + self.layers[1])),
@@ -196,33 +203,39 @@ class lstm_layer(object):
 
 	def forward(self,x):
 		temp = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		#self.prev_states[-1].mult(self.c_ig_weight,target=temp)
-		ai = cm.dot(x,self.i_ig_weight).add_dot(self.prev_outputs[-1],self.hm1_ig_weight)#.add(temp)
+		#Input Gates
+		self.prev_states[-1].mult(self.c_ig_weight,target=temp)
+		ai = cm.dot(x,self.i_ig_weight).add_dot(self.prev_outputs[-1],self.hm1_ig_weight).add(temp)
 		bi = cm.sigmoid(ai)
 
-		temp = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		#self.prev_states[-1].mult(self.c_fg_weight,target=temp)
-		af = cm.dot(x,self.i_fg_weight).add_dot(self.prev_outputs[-1],self.hm1_fg_weight)#.add(temp)
+		#Forget Gates
+		self.prev_states[-1].mult(self.c_fg_weight,target=temp)
+		af = cm.dot(x,self.i_fg_weight).add_dot(self.prev_outputs[-1],self.hm1_fg_weight).add(temp)
 		bf = cm.sigmoid(af)
 
+		#Cell States
 		ac = cm.dot(x,self.i_c_weight).add_dot(self.prev_outputs[-1],self.hm1_c_weight)
 		sc = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
 
-		temp = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		
+		#Forget Gates * Previous States
 		bf.mult(self.prev_states[-1],target=temp)
 		sc.add(temp)
-		temp = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+
+		#Input Gates * Cell Inputs
 		bi.mult(cm.sigmoid(ac),target=temp)
 		sc.add(temp)
-
-		temp = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		#self.prev_states[-1].mult(self.c_og_weight,target=temp)
-		ao = cm.dot(x,self.i_og_weight).add_dot(self.prev_outputs[-1],self.hm1_og_weight)#.add(temp)
+		
+		#Output Gates
+		self.prev_states[-1].mult(self.c_og_weight,target=temp)
+		ao = cm.dot(x,self.i_og_weight).add_dot(self.prev_outputs[-1],self.hm1_og_weight).add(temp)
 		bo = cm.sigmoid(ao)
 
+		#Block Outputs
 		self.output = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
 		bo.mult(cm.sigmoid(sc),target=self.output)
 
+		#Remember Parameters
 		self.prev_states.append(sc)
 		self.prev_outputs.append(self.output)
 		self.inputs.append(x)
@@ -233,63 +246,64 @@ class lstm_layer(object):
 		self.prev_ai.append(ai)
 		self.prev_bi.append(bi)
 		self.prev_bo.append(bo)
-
 		return self.output
 
-	def backward(self,grad):
-		inSum = cm.dot(self.prev_gc[-1],self.hm1_c_weight.T).add_dot(self.prev_gi[-1],self.hm1_ig_weight.T).add_dot(self.prev_gf[-1],self.hm1_fg_weight.T).add_dot(self.prev_go[-1],self.hm1_og_weight.T)
-		#inSum.add_dot(self.prev_gradInput[-1],self.i_c_weight).add_dot(self.prev_gradInput[-1],self.i_ig_weight).add_dot(self.prev_gradInput[-1],self.i_fg_weight).add_dot(self.prev_gradInput[-1],self.i_og_weight)
+	def backward(self,grad,t):
+		#Backpropogate Gradients from Gates at t+1 through Recurrent Weights to Block Output
+		recurrentGrad = cm.dot(self.prev_gc[-1],self.hm1_c_weight.T).add_dot(self.prev_gi[-1],self.hm1_ig_weight.T).add_dot(self.prev_gf[-1],self.hm1_fg_weight.T).add_dot(self.prev_go[-1],self.hm1_og_weight.T)
+		
+		#Gradient at Outputs
 		ec = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		ec.add(grad).add(inSum)
+		ec.add(grad).add(recurrentGrad)
 
+		#Gradient at Output Gates
 		go = cm.CUDAMatrix(np.ones([1,self.layers[1]])) 
-		cl.mult_by_sigmoid_deriv(go,self.prev_ao[-1])
-		go.mult(cm.sigmoid(self.prev_states[-1]).mult(ec))
+		cl.mult_by_sigmoid_deriv(go,self.prev_ao[t])
+		go.mult(cm.sigmoid(self.prev_states[t]).mult(ec))
 
 		es = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
-		cl.mult_by_sigmoid_deriv(es,self.prev_states[-1])
-		es.mult(self.prev_bo[-1]).mult(ec).add(self.prev_bf[-1].mult(self.prev_es[-1])).add(self.prev_gi[-1].mult(self.c_ig_weight)).add(self.prev_gf[-1].mult(self.c_fg_weight)).add(go.mult(self.c_og_weight))
+		cl.mult_by_sigmoid_deriv(es,self.prev_states[t])
+		es.mult(self.prev_bo[t]).mult(ec).add(self.prev_bf[t+1].mult(self.prev_es[-1])).add(self.prev_gi[-1].mult(self.c_ig_weight)).add(self.prev_gf[-1].mult(self.c_fg_weight)).add(go.mult(self.c_og_weight))
 
 		gc = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
-		cl.mult_by_sigmoid_deriv(gc,self.prev_ac[-1])
-		gc.mult(self.prev_bi[-1]).mult(es)
+		cl.mult_by_sigmoid_deriv(gc,self.prev_ac[t])
+		gc.mult(self.prev_bi[t]).mult(es)
 
 		gf = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
-		cl.mult_by_sigmoid_deriv(gf,self.prev_af[-2])
-		gf.mult(self.prev_states[-2].mult(es))
+		cl.mult_by_sigmoid_deriv(gf,self.prev_af[t-1])
+		gf.mult(self.prev_states[t-1].mult(es))
 
 		gi = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
-		cl.mult_by_sigmoid_deriv(gi,self.prev_ai[-1])
-		gi.mult(cm.sigmoid(self.prev_ac[-1]).mult(es))
+		cl.mult_by_sigmoid_deriv(gi,self.prev_ai[t])
+		gi.mult(cm.sigmoid(self.prev_ac[t]).mult(es))
 
 		#Accumulate Gradients
 
 		#gradInput = cm.dot(self.prev_gc[-1],self.i_c_weight.T).add_dot(self.prev_gi[-1],self.i_ig_weight.T).add_dot(self.prev_gf[-1],self.i_fg_weight.T).add_dot(self.prev_go[-1],self.i_og_weight.T)
-		
-		print(self.i_c_gweight.add_dot(self.inputs[-1].T,gc).asarray())
-		print(self.hm1_c_gweight.add_dot(self.prev_outputs[-1].T,gc).asarray())
+		#print('Input',self.inputs[-1].asarray())
+		self.i_c_gweight.add_dot(self.inputs[t].T,gc)
+		self.hm1_c_gweight.add_dot(self.prev_outputs[t].T,gc)
 
-		print(self.i_ig_gweight.add_dot(self.inputs[-1].T,gi).asarray())
-		print(self.hm1_ig_gweight.add_dot(self.prev_outputs[-1].T,gi).asarray())
+		self.i_ig_gweight.add_dot(self.inputs[t].T,gi)
+		self.hm1_ig_gweight.add_dot(self.prev_outputs[t].T,gi)
 
-		print(self.i_fg_gweight.add_dot(self.inputs[-1].T,gf).asarray())
-		print(self.hm1_fg_gweight.add_dot(self.prev_outputs[-1].T,gf).asarray())
+		self.i_fg_gweight.add_dot(self.inputs[t].T,gf)
+		self.hm1_fg_gweight.add_dot(self.prev_outputs[t].T,gf)
 
-		print(self.i_og_gweight.add_dot(self.inputs[-1].T,go).asarray())
-		print(self.hm1_og_gweight.add_dot(self.prev_outputs[-1].T,go).asarray())
+		self.i_og_gweight.add_dot(self.inputs[t].T,go)
+		self.hm1_og_gweight.add_dot(self.prev_outputs[t].T,go)
 
-		#temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
-		#temp.mult(gi).mult(self.prev_states[-1])
-		#self.c_ig_gweight.add(temp)
+		temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		temp.mult(gi).mult(self.prev_states[-1])
+		self.c_ig_gweight.add(temp)
 
-		#temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
-		#temp.mult(gf).mult(self.prev_states[-1])
-		#self.c_fg_gweight.add(temp)
+		temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		temp.mult(gf).mult(self.prev_states[-1])
+		self.c_fg_gweight.add(temp)
 
-		#temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
-		#temp.mult(go).mult(self.prev_states[-1])
-		#self.c_og_gweight.add(temp)
-
+		temp = cm.CUDAMatrix(np.ones([1,self.layers[1]]))
+		temp.mult(go).mult(self.prev_states[-1])
+		self.c_og_gweight.add(temp)
 
 		self.prev_ec.append(ec)
 		self.prev_es.append(es)
@@ -297,13 +311,8 @@ class lstm_layer(object):
 		self.prev_gc.append(gc)
 		self.prev_gf.append(gf)
 		self.prev_gi.append(gi)
-		#self.prev_gradInput.append(gradInput)
-		self.prev_outputs.pop()
-		self.inputs.pop()
-		self.prev_states.pop()
 
-
-	def updateWeights(self, lr):
+	def updateWeights(self,lr):
 		self.i_og_weight.subtract(self.i_og_gweight.mult(lr))
 		self.hm1_og_weight.subtract(self.hm1_og_gweight.mult(lr))
 		#self.c_og_weight.subtract(self.c_og_gweight.mult(lr))
