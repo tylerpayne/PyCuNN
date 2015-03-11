@@ -315,15 +315,15 @@ class lstm_layer(object):
 	def updateWeights(self,lr):
 		self.i_og_weight.subtract(self.i_og_gweight.mult(lr))
 		self.hm1_og_weight.subtract(self.hm1_og_gweight.mult(lr))
-		#self.c_og_weight.subtract(self.c_og_gweight.mult(lr))
+		self.c_og_weight.subtract(self.c_og_gweight.mult(lr))
 
 		self.i_fg_weight.subtract(self.i_fg_gweight.mult(lr))
 		self.hm1_fg_weight.subtract(self.hm1_fg_gweight.mult(lr))
-		#self.c_fg_weight.subtract(self.c_fg_gweight.mult(lr))
+		self.c_fg_weight.subtract(self.c_fg_gweight.mult(lr))
 
 		self.i_ig_weight.subtract(self.i_ig_gweight.mult(lr))
 		self.hm1_ig_weight.subtract(self.hm1_ig_gweight.mult(lr))
-		#self.c_ig_weight.subtract(self.c_ig_gweight.mult(lr))
+		self.c_ig_weight.subtract(self.c_ig_gweight.mult(lr))
 
 		self.i_c_weight.subtract(self.i_c_gweight.mult(lr))
 		self.hm1_c_weight.subtract(self.hm1_c_gweight.mult(lr))		
@@ -387,7 +387,7 @@ net = lstm([n_tokens,1000,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,3,enc)
+net.train(ds,20,enc)
 print('Time:',start)
 
 net.forget()
