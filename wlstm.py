@@ -74,7 +74,7 @@ class lstm(object):
 		self.hidden_layer.updateWeights(self.lr)
 		self.forget()
 
-	def train(self,ds,epochs,enc,seq_len=45,batch_size=1,lr=0.01,decay=0.999):
+	def train(self,ds,epochs,enc,seq_len=45,batch_size=1,lr=0.09,decay=0.999):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		ds_x = ds[:,:,0][0]
 		ds_t = ds[:,:,1][0]
