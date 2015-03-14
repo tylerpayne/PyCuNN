@@ -10,7 +10,7 @@ cm.shutdown()
 cm.init()
 
 class lstm(object):
-	def __init__(self, layers,uplim=1,lowlim=-1):
+	def __init__(self, layers,uplim=15,lowlim=-15):
 		super(lstm, self).__init__()
 
 		assert len(layers) is 3, "Only one-hidden-layer LSTM Netowrks are supported at this time"
@@ -68,8 +68,11 @@ class lstm(object):
 			self.gw2.add_dot(self.hidden_layer.prev_outputs[_+1].T,self.gOutput)
 			self.gb2.add_sums(self.gOutput,axis=0)
 
+			self.clip(self.gw2)
+			self.clip(self.gb2)
+
 			self.delta = cm.dot(self.gOutput,self.w2.T)
-			self.delta
+			self.clip(self.delta)
 			#print('Delta',self.delta.asarray())
 			self.hidden_layer.backward(self.delta,_+1)
 
@@ -86,6 +89,7 @@ class lstm(object):
 		param.mult(gmask).add(rmask.mult(self.lowlim))
 
 	def updateWeights(self):
+		
 		temp = [self.gw2,self.gb2]
 		self.w2.subtract(self.gw2.mult(self.lr).add(self.updates_tm1[0].mult(0.9)))
 		self.b2.subtract(self.gb2.mult(self.lr).add(self.updates_tm1[1].mult(0.9)))
@@ -94,7 +98,7 @@ class lstm(object):
 		self.forget()
 
 
-	def train(self,ds,epochs,enc,seq_len=45,batch_size=1,lr=0.01,decay=0.99):
+	def train(self,ds,epochs,enc,seq_len=45,batch_size=1,lr=0.05,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		ds_x = ds[:,:,0][0]
 		ds_t = ds[:,:,1][0]
@@ -102,7 +106,7 @@ class lstm(object):
 		err = []
 		for epoch in range(epochs):
 			print('Epoch:',epoch+1)
-			seq_len = int(np.random.uniform(low=50,high=175,size=(1))[0])
+			seq_len = int(np.random.uniform(low=5,high=35,size=(1))[0])
 			#print(seq_len)
 			for seq in range(ds.shape[1]/seq_len):
 				#print('seq',seq)
@@ -190,7 +194,7 @@ class lstm_layer(object):
 		self.prev_states.append(states)
 		self.prev_fgates.append(gates)
 		self.inputs.append(x)
-
+		#print(self.output.asarray())
 		return self.output
 
 	def backward(self,grad,t):
@@ -271,7 +275,6 @@ class lstm_layer(object):
 		di.add_dot(self.inputs[t].T,gi)
 		df.add_dot(self.inputs[t].T,gf)
 		do.add_dot(self.inputs[t].T,go)
-		dg.add_dot(self.inputs[t].T,gg)
 
 		dhi = self.ghm1_IFOG.get_col_slice(0,self.layers[1])
 		dhf = self.ghm1_IFOG.get_col_slice(self.layers[1],self.layers[1]*2)
@@ -282,6 +285,9 @@ class lstm_layer(object):
 		dhf.add_dot(self.prev_outputs[t-1].T,gf)
 		dho.add_dot(self.prev_outputs[t-1].T,go)
 		dhg.add_dot(self.prev_outputs[t-1].T,gg)
+
+		self.clip(self.ghm1_IFOG)
+		self.clip(self.gi_IFOG)
 		
 
 	def clip(self,param):
@@ -297,6 +303,8 @@ class lstm_layer(object):
 		param.mult(gmask).add(rmask.mult(self.lowlim))
 
 	def updateWeights(self,lr):
+		#self.clip(self.ghm1_IFOG)
+		#self.clip(self.gi_IFOG)
 		temp = [self.gi_IFOG,self.ghm1_IFOG]
 		self.i_IFOG.subtract(self.gi_IFOG.mult(lr).add(self.updates_tm1[0].mult(0.9)))
 		self.hm1_IFOG.subtract(self.ghm1_IFOG.mult(lr).add(self.updates_tm1[1].mult(0.9)))
@@ -327,7 +335,7 @@ class lstm_layer(object):
 
 ds = []
 print('Loading Text')
-with open('./siddhartha.txt') as doc:
+with open('./ptb.train.short.txt') as doc:
 	text = doc.read().rstrip("\n").split(" ")
 print('Building Dataset')
 enc = prepro.LabelBinarizer()
@@ -344,7 +352,7 @@ net = lstm([n_tokens,800,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,20,enc)
+net.train(ds,5,enc)
 print('Time:',start)
 
 net.forget()
