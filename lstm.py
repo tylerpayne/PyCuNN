@@ -44,7 +44,7 @@ class lstm(object):
 
 	def forward(self,x):
 		self.h = self.hidden_layer.forward(x)
-		logits = cm.exp(cm.dot(self.h,self.w2).add(self.b2))
+		logits = cm.exp(cm.dot(self.h,self.w2))#.add(self.b2))
 		self.output = logits.mult_by_col(cm.pow(cm.sum(logits,axis=1),-1))
 		self.inputs.append(x)
 		self.hs.append(self.h)
@@ -89,12 +89,12 @@ class lstm(object):
 		param.mult(gmask).add(rmask.mult(self.lowlim))
 
 	def updateWeights(self):
-		#self.w2.subtract(self.gw2.mult(self.lr))
+		self.w2.subtract(self.gw2.mult(self.lr))
 		#self.b2.subtract(self.gb2.mult(self.lr))
 		self.hidden_layer.updateWeights(self.lr)
 		self.forget()
 
-	def train(self,ds,epochs,enc,seq_len=45,batch_size=1,lr=0.1,decay=0.99):
+	def train(self,ds,epochs,enc,seq_len=45,batch_size=1,lr=0.05,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		ds_x = ds[:,:,0][0]
 		ds_t = ds[:,:,1][0]
@@ -102,7 +102,7 @@ class lstm(object):
 		err = []
 		for epoch in range(epochs):
 			print('Epoch:',epoch+1)
-			seq_len = int(np.random.uniform(low=45,high=100,size=(1))[0])
+			seq_len = int(np.random.uniform(low=10,high=35,size=(1))[0])
 			#print(seq_len)
 			for seq in range(ds.shape[1]/seq_len):
 				print('seq',seq)
