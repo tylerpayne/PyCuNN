@@ -9,19 +9,21 @@ cm.shutdown()
 cm.init()
 
 class lstm(object):
-	def __init__(self, layers):
+	def __init__(self, layers,uplim=1,lowlim=-1):
 		super(lstm, self).__init__()
 
 		assert len(layers) is 3, "Only one-hidden-layer LSTM Netowrks are supported at this time"
 		
 		self.layers = layers
 		self.outputs = []
+		self.uplim = uplim
+		self.lowlim = lowlim
 
 		# Build Netowrk
 
 		#LSTM Layer
 
-		self.hidden_layer = lstm_layer(layers)
+		self.hidden_layer = lstm_layer(layers,uplim,lowlim)
 
 		#Hidden to Output Weights
 
@@ -49,8 +51,9 @@ class lstm(object):
 		return self.output
 
 	def bptt(self,t):
-		#Set T+1 activations to 0
 		print('bptt')
+
+		#Set T+1 activations to 0
 		self.hidden_layer.prev_outputs.append(cm.CUDAMatrix(np.zeros(self.hidden_layer.prev_outputs[-1].shape)))
 		self.hidden_layer.prev_states.append(cm.CUDAMatrix(np.zeros(self.hidden_layer.prev_states[-1].shape)))
 		self.hidden_layer.prev_ac.append(cm.CUDAMatrix(np.zeros(self.hidden_layer.prev_ac[-1].shape)))
@@ -64,12 +67,25 @@ class lstm(object):
 		
 		for _ in range(t.shape[0]-1,-1,-1):
 			self.outputs[_+1].subtract(t[_],target=self.gOutput)
-			self.gw2.add_dot(self.hidden_layer.prev_outputs[_+1].T,self.gOutput)
-			self.gb2.add_sums(self.gOutput,axis=0)
+			self.clip(self.gw2.add_dot(self.hidden_layer.prev_outputs[_+1].T,self.gOutput))
+			self.clip(self.gb2.add_sums(self.gOutput,axis=0))
 
 			self.delta = cm.dot(self.gOutput,self.w2.T)
-			#print(self.delta.asarray())
+			self.clip(self.delta)
+			#print('Delta',self.delta.asarray())
 			self.hidden_layer.backward(self.delta,_+1)
+
+	def clip(self,param):
+		gmask = cm.CUDAMatrix(np.zeros(param.shape))
+		rmask = cm.CUDAMatrix(np.zeros(param.shape))
+
+		param.less_than(self.uplim,target=gmask)
+		gmask.equals(0,target=rmask)
+		param.mult(gmask).add(rmask.mult(self.uplim))
+
+		param.greater_than(self.lowlim,target=gmask)
+		gmask.equals(0,target=rmask)
+		param.mult(gmask).add(rmask.mult(self.lowlim))
 
 	def updateWeights(self):
 		self.w2.subtract(self.gw2.mult(self.lr))
@@ -77,7 +93,7 @@ class lstm(object):
 		self.hidden_layer.updateWeights(self.lr)
 		self.forget()
 
-	def train(self,ds,epochs,enc,seq_len=45,batch_size=1,lr=0.05,decay=0.999):
+	def train(self,ds,epochs,enc,seq_len=45,batch_size=1,lr=0.05,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		ds_x = ds[:,:,0][0]
 		ds_t = ds[:,:,1][0]
@@ -123,7 +139,7 @@ class lstm(object):
 
 		
 class lstm_layer(object):
-	def __init__(self, layers):
+	def __init__(self, layers,uplim=1,lowlim=-1):
 		super(lstm_layer, self).__init__()
 
 		self.layers = layers
@@ -232,11 +248,16 @@ class lstm_layer(object):
 			size = (1,self.layers[1])
 		))
 
+		self.uplim = uplim
+		self.lowlim = lowlim
+
+
 		self.forget()
 
 	def forward(self,x):
 		
 		temp = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+
 		#Input Gates
 		ai = cm.dot(x,self.i_ig_weight).add(self.i_ig_bias).add_dot(self.prev_outputs[-1],self.hm1_ig_weight).add(self.hm1_ig_bias)
 		#print(ai.asarray())
@@ -279,7 +300,7 @@ class lstm_layer(object):
 		self.prev_ai.append(ai)
 		self.prev_bi.append(bi)
 		self.prev_bo.append(bo)
-		print(self.output.asarray())
+		#print(self.output.asarray())
 		return self.output
 
 	def backward(self,grad,t):
@@ -287,11 +308,12 @@ class lstm_layer(object):
 
 		temp = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
 		#print(temp.asarray())
+
 		#Backpropogate Gradients from Gates at t+1 through Recurrent Weights to Block Output
 		recurrentGrad = cm.dot(self.prev_gc[-1],self.hm1_c_weight.T).add_dot(self.prev_gi[-1],self.hm1_ig_weight.T).add_dot(self.prev_gf[-1],self.hm1_fg_weight.T).add_dot(self.prev_go[-1],self.hm1_og_weight.T)
 		#print(recurrentGrad.asarray())
 
-		#Gradient at Outputs
+		#Gradient at Block Outputs
 		#print(grad.asarray())
 		ec = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
 		#print(ec.asarray())
@@ -331,13 +353,21 @@ class lstm_layer(object):
 		#print(gf.asarray())
 		self.prev_states[t-1].mult(es,target=gf)
 		cl.mult_by_sigmoid_deriv(gf,self.prev_af[t])
-		print(gf.asarray())
+		#print(gf.asarray())
 
 		#Gradient at Input Gate
 		gi = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		cm.sigmoid(self.prev_ac[t],target=temp)
-		es.mult(temp,target=gi)
+		cm.sigmoid(self.prev_ac[t],target=gi)
+		gi.mult(es)
 		cl.mult_by_sigmoid_deriv(gi,self.prev_ai[t])
+
+		self.clip(gc)
+		self.clip(gi)
+		self.clip(go)
+		self.clip(gf)
+		self.clip(es)
+		self.clip(ec)
+		self.clip(gc)
 
 		self.prev_ec.append(ec)
 		self.prev_es.append(es)
@@ -345,31 +375,45 @@ class lstm_layer(object):
 		self.prev_gc.append(gc)
 		self.prev_gf.append(gf)
 		self.prev_gi.append(gi)
-		#print(len(self.prev_gc))
+		#print('GC',gc.asarray())
 
 		#Accumulate Gradients
 
 		#gradInput = cm.dot(self.prev_gc[-1],self.i_c_weight.T).add_dot(self.prev_gi[-1],self.i_ig_weight.T).add_dot(self.prev_gf[-1],self.i_fg_weight.T).add_dot(self.prev_go[-1],self.i_og_weight.T)
 		#print('Input',self.inputs[t].asarray())
-		self.i_c_gweight.add_dot(self.inputs[t].T,gc)
-		self.hm1_c_gweight.add_dot(self.prev_outputs[t].T,gc)
-		self.i_c_gbias.add_sums(gc,axis=0)
-		self.hm1_c_gbias.add_sums(gc,axis=0)
+		#print('GWEIGHT',self.hm1_ig_gweight.asarray())
+		#print(self.prev_outputs[t].asarray())
+		self.clip(self.i_c_gweight.add_dot(self.inputs[t].T,gc))
+		self.clip(self.hm1_c_gweight.add_dot(self.prev_outputs[t].T,gc))
+		self.clip(self.i_c_gbias.add_sums(gc,axis=0))
+		self.clip(self.hm1_c_gbias.add_sums(gc,axis=0))
 
-		self.i_ig_gweight.add_dot(self.inputs[t].T,gi)
-		self.hm1_ig_gweight.add_dot(self.prev_outputs[t].T,gi)
-		self.i_ig_gbias.add_sums(gi,axis=0)
-		self.hm1_ig_gbias.add_sums(gi,axis=0)
+		self.clip(self.i_ig_gweight.add_dot(self.inputs[t].T,gi))
+		self.clip(self.hm1_ig_gweight.add_dot(self.prev_outputs[t].T,gi))
+		self.clip(self.i_ig_gbias.add_sums(gi,axis=0))
+		self.clip(self.hm1_ig_gbias.add_sums(gi,axis=0))
 
-		self.i_fg_gweight.add_dot(self.inputs[t].T,gf)
-		self.hm1_fg_gweight.add_dot(self.prev_outputs[t].T,gf)
-		self.i_fg_gbias.add_sums(gf,axis=0)
-		self.hm1_fg_gbias.add_sums(gf,axis=0)
+		self.clip(self.i_fg_gweight.add_dot(self.inputs[t].T,gf))
+		self.clip(self.hm1_fg_gweight.add_dot(self.prev_outputs[t].T,gf))
+		self.clip(self.i_fg_gbias.add_sums(gf,axis=0))
+		self.clip(self.hm1_fg_gbias.add_sums(gf,axis=0))
 
-		self.i_og_gweight.add_dot(self.inputs[t].T,go)
-		self.hm1_og_gweight.add_dot(self.prev_outputs[t].T,go)
-		self.i_og_gbias.add_sums(go,axis=0)
-		self.hm1_og_gbias.add_sums(go,axis=0)
+		self.clip(self.i_og_gweight.add_dot(self.inputs[t].T,go))
+		self.clip(self.hm1_og_gweight.add_dot(self.prev_outputs[t].T,go))
+		self.clip(self.i_og_gbias.add_sums(go,axis=0))
+		self.clip(self.hm1_og_gbias.add_sums(go,axis=0))
+
+	def clip(self,param):
+		gmask = cm.CUDAMatrix(np.zeros(param.shape))
+		rmask = cm.CUDAMatrix(np.zeros(param.shape))
+
+		param.less_than(self.uplim,target=gmask)
+		gmask.equals(0,target=rmask)
+		param.mult(gmask).add(rmask.mult(self.uplim))
+
+		param.greater_than(self.lowlim,target=gmask)
+		gmask.equals(0,target=rmask)
+		param.mult(gmask).add(rmask.mult(self.lowlim))
 
 	def updateWeights(self,lr):
 		self.i_og_weight.subtract(self.i_og_gweight.mult(lr))
@@ -391,6 +435,8 @@ class lstm_layer(object):
 		self.hm1_c_weight.subtract(self.hm1_c_gweight.mult(lr))
 		self.i_c_bias.subtract(self.i_c_gbias.mult(lr))
 		self.hm1_c_bias.subtract(self.hm1_c_gbias.mult(lr))
+
+		print(self.hm1_c_weight.asarray())
 
 	def forget(self):
 		self.reset_activations()
@@ -444,7 +490,7 @@ class lstm_layer(object):
 ds = []
 print('Loading Text')
 with open('./siddhartha.txt') as doc:
-	text = doc.read().split(" ")
+	text = doc.read().rstrip("\n").split(" ")
 print('Building Dataset')
 enc = prepro.LabelBinarizer()
 enc.fit(text)
