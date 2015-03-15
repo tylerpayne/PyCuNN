@@ -10,7 +10,7 @@ cm.shutdown()
 cm.init()
 
 class lstm(object):
-	def __init__(self, layers,uplim=15,lowlim=-15):
+	def __init__(self, layers,uplim=8,lowlim=-8):
 		super(lstm, self).__init__()
 
 		assert len(layers) is 3, "Only one-hidden-layer LSTM Netowrks are supported at this time"
@@ -68,25 +68,19 @@ class lstm(object):
 			self.gw2.add_dot(self.hidden_layer.prev_outputs[_+1].T,self.gOutput)
 			self.gb2.add_sums(self.gOutput,axis=0)
 
-			#self.clip(self.gw2)
-			#self.clip(self.gb2)
+			self.clip(self.gw2)
+			self.clip(self.gb2)
 
 			self.delta = cm.dot(self.gOutput,self.w2.T)
-			#self.delta
+			self.clip(self.delta)
 			#print('Delta',self.delta.asarray())
 			self.hidden_layer.backward(self.delta,_+1)
 
 	def clip(self,param):
-		gmask = cm.CUDAMatrix(np.zeros(param.shape))
-		rmask = cm.CUDAMatrix(np.zeros(param.shape))
-
-		param.less_than(self.uplim,target=gmask)
-		gmask.equals(0,target=rmask)
-		param.mult(gmask).add(rmask.mult(self.uplim))
-
-		param.greater_than(self.lowlim,target=gmask)
-		gmask.equals(0,target=rmask)
-		param.mult(gmask).add(rmask.mult(self.lowlim))
+		norm = param.euclid_norm()
+		if norm > self.uplim:
+			param.mult(float(self.uplim) / norm)
+		
 
 	def updateWeights(self):
 		self.w2.subtract(self.gw2.mult(self.lr).add(self.updates_tm1[0].mult(0.9)))
@@ -252,7 +246,6 @@ class lstm_layer(object):
 		gi.mult(es)
 		cl.mult_by_sigmoid_deriv(gi,i)
 
-
 		self.prev_es.append(es)
 
 		ggates = cm.CUDAMatrix(np.zeros((1,self.layers[1]*4)))
@@ -285,27 +278,15 @@ class lstm_layer(object):
 		dhg.add_dot(self.prev_outputs[t-1].T,gg)
 
 		self.clip(self.gi_IFOG)
+		self.clip(self.ghm1_IFOG)
 
 	def clip(self,param):
-
-		print(param.euclid_norm())
-
-		'''gmask = cm.CUDAMatrix(np.zeros(param.shape))
-		rmask = cm.CUDAMatrix(np.zeros(param.shape))
-
-		param.less_than(self.uplim,target=gmask)
-		gmask.equals(0,target=rmask)
-		param.mult(gmask).add(rmask.mult(self.uplim))
-
-		param.greater_than(self.lowlim,target=gmask)
-		gmask.equals(0,target=rmask)
-		param.mult(gmask).add(rmask.mult(self.lowlim))
-		'''
+		norm = param.euclid_norm()
+		if norm > self.uplim:
+			param.mult(float(self.uplim) / norm)
 
 	def updateWeights(self,lr):
 		#self.clip(self.ghm1_IFOG)
-		
-
 		self.i_IFOG.subtract(self.gi_IFOG.mult(lr).add(self.updates_tm1[0].mult(0.9)))
 		self.hm1_IFOG.subtract(self.ghm1_IFOG.mult(lr).add(self.updates_tm1[1].mult(0.9)))
 		self.updates_tm1 = [self.gi_IFOG,self.ghm1_IFOG]
@@ -335,7 +316,7 @@ class lstm_layer(object):
 
 ds = []
 print('Loading Text')
-with open('./ptb.train.short.txt') as doc:
+with open('../data/ptb.train.short.txt') as doc:
 	text = doc.read().rstrip("\n").split(" ")
 print('Building Dataset')
 enc = prepro.LabelBinarizer()
@@ -352,7 +333,7 @@ net = lstm([n_tokens,800,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,2,enc)
+net.train(ds,8,enc)
 print('Time:',start)
 
 net.forget()
