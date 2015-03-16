@@ -48,7 +48,6 @@ class lstm(object):
 		logits = cm.exp(cm.dot(self.h,self.w2).add(self.b2))
 		self.output = logits.mult_by_col(cm.pow(cm.sum(logits,axis=1),-1))
 		self.inputs.append(x)
-		self.hs.append(self.h)
 		self.outputs.append(self.output)
 		return self.output
 
@@ -62,25 +61,29 @@ class lstm(object):
 		self.hidden_layer.prev_fgates.append(cm.CUDAMatrix(np.zeros(self.hidden_layer.prev_fgates[-1].shape)))
 	
 		#print(t.shape[0],len(self.outputs),len(self.inputs),len(self.hidden_layer.prev_outputs),len(self.hidden_layer.prev_states),len(self.hidden_layer.prev_ac))
-		
-		for _ in range(t.shape[0]-1,-1,-1):
+		self.outputs[t.shape[0]].subtract(t[-1],target=self.gOutput)
+		self.gw2.add_dot(self.hidden_layer.prev_outputs[t.shape[0]].T,self.gOutput)
+		self.gb2.add_sums(self.gOutput,axis=0)
+
+		self.delta = cm.dot(self.gOutput,self.w2.T)
+		self.clip(self.delta)
+
+		self.hidden_layer.backward(self.delta,t.shape[0])
+
+		self.delta.mult(0)
+
+		for _ in range(t.shape[0]-2,-1,-1):	
+			#print('Delta',self.delta.asarray())
 			self.outputs[_+1].subtract(t[_],target=self.gOutput)
-			self.gw2.add_dot(self.hidden_layer.prev_outputs[_+1].T,self.gOutput)
-			self.gb2.add_sums(self.gOutput,axis=0)
-
-			self.clip(self.gw2)
-			self.clip(self.gb2)
-
 			self.delta = cm.dot(self.gOutput,self.w2.T)
 			self.clip(self.delta)
-			#print('Delta',self.delta.asarray())
+
 			self.hidden_layer.backward(self.delta,_+1)
 
 	def clip(self,param):
 		norm = param.euclid_norm()
 		if norm > self.uplim:
 			param.mult(float(self.uplim) / norm)
-		
 
 	def updateWeights(self):
 		self.w2.subtract(self.gw2.mult(self.lr).add(self.updates_tm1[0].mult(0.9)))
@@ -95,8 +98,9 @@ class lstm(object):
 		ds_x = ds[:,:,0][0]
 		ds_t = ds[:,:,1][0]
 		self.lr = lr/batch_size
-		err = []
+		
 		for epoch in range(epochs):
+			correct = 0
 			print('Epoch:',epoch+1)
 			seq_len = int(np.random.uniform(low=50,high=175,size=(1))[0])
 			#print(seq_len)
@@ -106,12 +110,16 @@ class lstm(object):
 				d = ds_t[seq*seq_len:(seq+1)*seq_len]
 				for t in range(x.shape[0]):
 					self.forward(x[t])
+					for y in self.outputs[1:]:
+						if d[t].argmax(axis=1).asarray()[0][0] == y.argmax(axis=1).asarray()[0][0]:
+							correct += 1
 				self.bptt(d)
 				if seq % batch_size == 0:
-					print('Output:',enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1].asarray()),'Target',enc.inverse_transform(d[-1].asarray()))
+					#print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1].asarray()),'Target',enc.inverse_transform(d[-1].asarray()))
 					self.updateWeights()
 					#self.lr = self.lr * decay
 				self.reset_activations()
+			print('Epoch:',epoch+1,"Accuracy:",float(correct)/float(ds.shape[1]))
 
 
 	def reset_grads(self):
@@ -246,6 +254,7 @@ class lstm_layer(object):
 		gi.mult(es)
 		cl.mult_by_sigmoid_deriv(gi,i)
 
+		self.clip(es)
 		self.prev_es.append(es)
 
 		ggates = cm.CUDAMatrix(np.zeros((1,self.layers[1]*4)))
@@ -254,6 +263,7 @@ class lstm_layer(object):
 		ggates.set_col_slice(self.layers[1]*2,self.layers[1]*3,go)
 		ggates.set_col_slice(self.layers[1]*3,self.layers[1]*4,gg)
 
+		self.clip(ggates)
 		self.prev_ggates.append(ggates)
 
 		#Accumulate Gradients
@@ -290,6 +300,7 @@ class lstm_layer(object):
 		self.i_IFOG.subtract(self.gi_IFOG.mult(lr).add(self.updates_tm1[0].mult(0.9)))
 		self.hm1_IFOG.subtract(self.ghm1_IFOG.mult(lr).add(self.updates_tm1[1].mult(0.9)))
 		self.updates_tm1 = [self.gi_IFOG,self.ghm1_IFOG]
+		#print(self.i_IFOG.asarray())
 
 	def forget(self):
 		self.reset_activations()
@@ -333,7 +344,7 @@ net = lstm([n_tokens,800,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,8,enc)
+net.train(ds,100,enc)
 print('Time:',start)
 
 net.forget()
