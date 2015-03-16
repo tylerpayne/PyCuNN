@@ -65,8 +65,8 @@ class lstm(object):
 		for _ in range(t.shape[0]-1,-1,-1):	
 			#print('Delta',self.delta.asarray())
 			self.outputs[_+1].subtract(t[_],target=self.gOutput)
-			self.gw2.add_dot(self.hidden_layer.prev_outputs[_+1].T,self.gOutput)
-			self.gb2.add_sums(self.gOutput,axis=0)
+			self.clip(self.gw2.add_dot(self.hidden_layer.prev_outputs[_+1].T,self.gOutput))
+			self.clip(self.gb2.add_sums(self.gOutput,axis=0))
 
 			self.delta = cm.dot(self.gOutput,self.w2.T)
 			self.clip(self.delta)
