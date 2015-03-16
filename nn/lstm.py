@@ -91,7 +91,9 @@ class lstm(object):
 		ds_x = ds[:,:,0][0]
 		ds_t = ds[:,:,1][0]
 		self.lr = lr/batch_size
-		
+		self.last_best_acc = 0
+		acc = 0
+		self.last_best_model = []
 		for epoch in range(epochs):
 			correct = 0
 			print('Begin Epoch:',epoch+1)
@@ -105,13 +107,17 @@ class lstm(object):
 					self.forward(x[t])
 					if d[t].argmax(axis=1).asarray()[0][0] == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
 						correct += 1
+				acc = float(correct)/float(ds.shape[1])
+				if acc > last_best_acc:
+					self.last_best_acc = acc
+					self.last_best_model = [self.w2.asarray(),self.b2.asarray(),self.hidden_layer.i_IFOG.asarray(),self.hidden_layer.hm1_IFOG.asarray()]
 				self.bptt(d)
 				if seq % batch_size == 0:
 					#print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1].asarray()),'Target',enc.inverse_transform(d[-1].asarray()))
 					self.updateWeights()
 					self.lr = self.lr * decay
 				self.reset_activations()
-			print('Trained Epoch:',epoch+1,"Accuracy:",float(correct)/float(ds.shape[1]))
+			print('Trained Epoch:',epoch+1,"Accuracy:",acc)
 
 
 	def reset_grads(self):
@@ -133,6 +139,12 @@ class lstm(object):
 		self.reset_grads()
 		self.reset_activations()
 		self.hidden_layer.forget()
+
+	def last_best(self):
+		self.w2 = self.last_best_model[0]
+		self.b2 = self.last_best_model[1]
+		self.hidden_layer.i_IFOG = self.last_best_model[2]
+		self.hidden_layer.hm1_IFOG = self.last_best_model[3]
 
 		
 class lstm_layer(object):
@@ -338,6 +350,8 @@ start = timeit.timeit()
 print('Starting Training')
 net.train(ds,50,enc)
 print('Time:',start)
+
+net.last_best()
 
 net.forget()
 seq = [enc.inverse_transform(ds[0][12][0].asarray())]
