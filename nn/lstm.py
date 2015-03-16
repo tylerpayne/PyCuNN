@@ -97,7 +97,6 @@ class lstm(object):
 			print('Begin Epoch:',epoch+1)
 			seq_len = int(np.random.uniform(low=50,high=175,size=(1))[0])
 			#print(seq_len)
-			print(ds.shape[1])
 			for seq in range(ds.shape[1]/seq_len):
 				#print('seq',seq)
 				x = ds_x[seq*seq_len:(seq+1)*seq_len]
@@ -337,7 +336,7 @@ net = lstm([n_tokens,800,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,10,enc)
+net.train(ds,50,enc)
 print('Time:',start)
 
 net.forget()
