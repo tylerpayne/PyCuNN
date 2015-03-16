@@ -348,7 +348,7 @@ net = lstm([n_tokens,800,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,50,enc)
+net.train(ds,125,enc)
 print('Time:',start)
 
 net.last_best()
