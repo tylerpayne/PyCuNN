@@ -115,7 +115,7 @@ class lstm(object):
 				if seq % batch_size == 0:
 					#print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1].asarray()),'Target',enc.inverse_transform(d[-1].asarray()))
 					self.updateWeights()
-					self.lr = self.lr * decay
+					#self.lr = self.lr * decay
 				self.reset_activations()
 			print('Trained Epoch:',epoch+1,"Accuracy:",acc)
 
