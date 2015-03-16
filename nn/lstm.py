@@ -108,7 +108,7 @@ class lstm(object):
 					if d[t].argmax(axis=1).asarray()[0][0] == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
 						correct += 1
 				acc = float(correct)/float(ds.shape[1])
-				if acc > last_best_acc:
+				if acc > self.last_best_acc:
 					self.last_best_acc = acc
 					self.last_best_model = [self.w2.asarray(),self.b2.asarray(),self.hidden_layer.i_IFOG.asarray(),self.hidden_layer.hm1_IFOG.asarray()]
 				self.bptt(d)
@@ -141,10 +141,10 @@ class lstm(object):
 		self.hidden_layer.forget()
 
 	def last_best(self):
-		self.w2 = self.last_best_model[0]
-		self.b2 = self.last_best_model[1]
-		self.hidden_layer.i_IFOG = self.last_best_model[2]
-		self.hidden_layer.hm1_IFOG = self.last_best_model[3]
+		self.w2 = cm.CUDAMatrix(self.last_best_model[0])
+		self.b2 = cm.CUDAMatrix(self.last_best_model[1])
+		self.hidden_layer.i_IFOG = cm.CUDAMatrix(self.last_best_model[2])
+		self.hidden_layer.hm1_IFOG = cm.CUDAMatrix(self.last_best_model[3])
 
 		
 class lstm_layer(object):
