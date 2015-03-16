@@ -61,20 +61,13 @@ class lstm(object):
 		self.hidden_layer.prev_fgates.append(cm.CUDAMatrix(np.zeros(self.hidden_layer.prev_fgates[-1].shape)))
 	
 		#print(t.shape[0],len(self.outputs),len(self.inputs),len(self.hidden_layer.prev_outputs),len(self.hidden_layer.prev_states),len(self.hidden_layer.prev_ac))
-		self.outputs[t.shape[0]].subtract(t[-1],target=self.gOutput)
-		self.gw2.add_dot(self.hidden_layer.prev_outputs[t.shape[0]].T,self.gOutput)
-		self.gb2.add_sums(self.gOutput,axis=0)
-
-		self.delta = cm.dot(self.gOutput,self.w2.T)
-		self.clip(self.delta)
-
-		self.hidden_layer.backward(self.delta,t.shape[0])
-
-		self.delta.mult(0)
-
-		for _ in range(t.shape[0]-2,-1,-1):	
+		
+		for _ in range(t.shape[0]-1,-1,-1):	
 			#print('Delta',self.delta.asarray())
 			self.outputs[_+1].subtract(t[_],target=self.gOutput)
+			self.gw2.add_dot(self.hidden_layer.prev_outputs[_+1].T,self.gOutput)
+			self.gb2.add_sums(self.gOutput,axis=0)
+
 			self.delta = cm.dot(self.gOutput,self.w2.T)
 			self.clip(self.delta)
 
@@ -112,7 +105,6 @@ class lstm(object):
 				for t in range(x.shape[0]):
 					self.forward(x[t])
 					if d[t].argmax(axis=1).asarray()[0][0] == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
-						print(d[t].argmax(axis=1).asarray()[0][0])
 						correct += 1
 				self.bptt(d)
 				if seq % batch_size == 0:
