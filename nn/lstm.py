@@ -101,25 +101,26 @@ class lstm(object):
 		
 		for epoch in range(epochs):
 			correct = 0
-			print('Epoch:',epoch+1)
+			print('Begin Epoch:',epoch+1)
 			seq_len = int(np.random.uniform(low=50,high=175,size=(1))[0])
 			#print(seq_len)
+			print(ds.shape[1])
 			for seq in range(ds.shape[1]/seq_len):
 				#print('seq',seq)
 				x = ds_x[seq*seq_len:(seq+1)*seq_len]
 				d = ds_t[seq*seq_len:(seq+1)*seq_len]
 				for t in range(x.shape[0]):
 					self.forward(x[t])
-					for y in self.outputs[1:]:
-						if d[t].argmax(axis=1).asarray()[0][0] == y.argmax(axis=1).asarray()[0][0]:
-							correct += 1
+					if d[t].argmax(axis=1).asarray()[0][0] == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
+						print(d[t].argmax(axis=1).asarray()[0][0])
+						correct += 1
 				self.bptt(d)
 				if seq % batch_size == 0:
 					#print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1].asarray()),'Target',enc.inverse_transform(d[-1].asarray()))
 					self.updateWeights()
 					#self.lr = self.lr * decay
 				self.reset_activations()
-			print('Epoch:',epoch+1,"Accuracy:",float(correct)/float(ds.shape[1]))
+			print('Trained Epoch:',epoch+1,"Accuracy:",float(correct)/float(ds.shape[1]))
 
 
 	def reset_grads(self):
@@ -344,7 +345,7 @@ net = lstm([n_tokens,800,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,100,enc)
+net.train(ds,10,enc)
 print('Time:',start)
 
 net.forget()
