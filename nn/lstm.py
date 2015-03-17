@@ -10,7 +10,7 @@ cm.shutdown()
 cm.init()
 
 class lstm(object):
-	def __init__(self, layers,uplim=8,lowlim=-8):
+	def __init__(self, layers,uplim=15,lowlim=-15):
 		super(lstm, self).__init__()
 		
 		self.layers = layers
@@ -91,7 +91,7 @@ class lstm(object):
 		self.forget()
 
 
-	def train(self,ds,epochs,enc,batch_size=1,lr=0.01,decay=0.99):
+	def train(self,ds,epochs,enc,batch_size=10,lr=0.01,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr/batch_size
 		self.last_best_acc = 0
@@ -124,7 +124,7 @@ class lstm(object):
 					#print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1][0].asarray()),'Target',enc.inverse_transform(targets[-1].asarray()))
 					self.updateWeights()
 					#self.lr = self.lr * decay
-				self.reset_activations()
+				#self.reset_activations()
 			
 			print('Trained Epoch:',epoch+1,"With Accuracy:",acc)
 
