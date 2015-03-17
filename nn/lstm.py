@@ -332,7 +332,9 @@ class lstm_layer(object):
 ds = []
 print('Loading Text')
 with open('../data/ptb.train.short.txt') as doc:
-	text = doc.read().rstrip("\n").split(" ")
+	text = doc.read().split(' ')
+	#text = text.split('\n')
+print(text)
 print('Building Dataset')
 enc = prepro.LabelBinarizer()
 enc.fit(text)
