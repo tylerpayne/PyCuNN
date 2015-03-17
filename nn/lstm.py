@@ -48,7 +48,13 @@ class lstm(object):
 		self.h = x
 		for hid in self.hidden_layers:
 			self.h = hid.forward(self.h)
-		logits = cm.exp(cm.dot(self.h,self.w2).add(self.b2))
+
+		dropw2 = cm.CUDAMatrix(np.zeros(self.w2.shape))
+		self.dmasks[0].mult(self.w2,target = dropw2)
+		dropb2 = cm.CUDAMatrix(np.zeros(self.b2.shape))
+		self.dmasks[1].mult(self.b2,target = dropb2)
+
+		logits = cm.exp(cm.dot(self.h,dropw2)).add(dropb2)
 		self.output = logits.mult_by_col(cm.pow(cm.sum(logits,axis=1),-1))
 		self.inputs.append(x)
 		self.outputs.append(self.output)
@@ -68,10 +74,13 @@ class lstm(object):
 		for _ in range(len(t)-1,-1,-1):	
 			#print('Delta',self.delta.asarray())
 			self.outputs[_+1].subtract(t[_],target=self.gOutput)
-			self.clip(self.gw2.add_dot(self.hidden_layers[-1].prev_outputs[_+1].T,self.gOutput))
-			self.clip(self.gb2.add_sums(self.gOutput,axis=0))
+			self.clip(self.gw2.add_dot(self.hidden_layers[-1].prev_outputs[_+1].T,self.gOutput).mult(self.dmasks[0]))
+			self.clip(self.gb2.add_sums(self.gOutput,axis=0).mult(self.dmasks[1]))
 
-			self.delta = cm.dot(self.gOutput,self.w2.T)
+			dropw2 = cm.CUDAMatrix(np.zeros(self.w2.shape))
+			self.dmasks[0].mult(self.w2,target = dropw2)
+
+			self.delta = cm.dot(self.gOutput,dropw2.T)
 			self.clip(self.delta)
 			for hid in reversed(self.hidden_layers):
 				hid.backward(self.delta,_+1)
@@ -138,6 +147,7 @@ class lstm(object):
 
 	def reset_activations(self):
 		#print("MAIN RESET")
+		self.dmasks = [cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.w2.shape)),cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.b2.shape))]
 		self.output = cm.CUDAMatrix(np.zeros([1,self.layers[-1]]))
 		self.outputs = [cm.CUDAMatrix(np.zeros([1,self.layers[-1]]))]
 		self.h = cm.CUDAMatrix(np.zeros([1,self.layers[-2]]))
@@ -146,8 +156,15 @@ class lstm(object):
 		for hid in self.hidden_layers:
 			hid.reset_activations()
 
-	def new_dropout(self,param,p=0.8):
-		return cm.CUDAMatrix(np.random.binomial(n=1,p=p,size=param.shape))
+	def dropout(self,param,p=0.8):
+		retval = None
+		if param in self.dropout_keys:
+			retval = param.mult(self.dropout_keys[param])
+		else:
+			mask = cm.CUDAMatrix(np.random.binomial(n=1,p=p,size=param.shape))
+			self.dropout_keys[param] = mask
+			retval = param.mult(mask)
+		return retval
 
 	def forget(self):
 		self.reset_grads()
@@ -195,8 +212,13 @@ class lstm_layer(object):
 	def forward(self,x):
 
 		temp = cm.CUDAMatrix(np.zeros((1,self.layers[1])))
-		
-		gates = cm.dot(x,self.i_IFOG).add(cm.dot(self.prev_outputs[-1],self.hm1_IFOG))
+
+		drop_i_IFOG = cm.CUDAMatrix(np.zeros(self.i_IFOG.shape))
+		self.dmasks[0].mult(self.i_IFOG,target=drop_i_IFOG)
+		drop_hm1_IFOG = cm.CUDAMatrix(np.zeros(self.hm1_IFOG.shape))
+		self.dmasks[1].mult(self.hm1_IFOG,target=drop_hm1_IFOG)
+
+		gates = cm.dot(x,drop_i_IFOG).add(cm.dot(self.prev_outputs[-1],drop_hm1_IFOG))
 		self.prev_gates.append(gates)
 		cm.sigmoid(gates)
 
@@ -290,7 +312,9 @@ class lstm_layer(object):
 		self.clip(ggates)
 		self.prev_ggates.append(ggates)
 
-		self.gradInput = cm.dot(ggates,self.i_IFOG.T)
+		drop_i_IFOG = cm.CUDAMatrix(np.zeros(self.i_IFOG.shape))
+		self.dmasks[0].mult(self.i_IFOG,target=drop_i_IFOG)
+		self.gradInput = cm.dot(ggates,drop_i_IFOG.T)
 		self.clip(self.gradInput)
 
 		#Accumulate Gradients
@@ -314,8 +338,8 @@ class lstm_layer(object):
 		dho.add_dot(self.prev_outputs[t-1].T,go)
 		dhg.add_dot(self.prev_outputs[t-1].T,gg)
 
-		self.clip(self.gi_IFOG)
-		self.clip(self.ghm1_IFOG)
+		self.clip(self.gi_IFOG.mult(self.dmasks[0]))
+		self.clip(self.ghm1_IFOG.mult(self.dmasks[1]))
 
 	def clip(self,param):
 		norm = param.euclid_norm()
@@ -335,7 +359,7 @@ class lstm_layer(object):
 
 	def reset_activations(self):
 		#print('RESETTING')
-
+		self.dmasks = [cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.i_IFOG.shape)),cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.hm1_IFOG.shape))]
 		self.prev_states = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
 		self.prev_outputs =[cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
 		self.prev_gates =[cm.CUDAMatrix(np.zeros([1,self.layers[1]*4]))]
@@ -356,7 +380,7 @@ class lstm_layer(object):
 
 ds = []
 print('Loading Text')
-with open('../data/ptb.train.txt') as doc:
+with open('../data/ptb.train.short.txt') as doc:
 	f = doc.read()
 	words = f.split(' ')
 	sequences = f.split('\n')
