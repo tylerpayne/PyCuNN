@@ -49,12 +49,12 @@ class lstm(object):
 		for hid in self.hidden_layers:
 			self.h = hid.forward(self.h)
 
-		dropw2 = cm.CUDAMatrix(np.zeros(self.w2.shape))
-		self.dmasks[0].mult(self.w2,target = dropw2)
-		dropb2 = cm.CUDAMatrix(np.zeros(self.b2.shape))
-		self.dmasks[1].mult(self.b2,target = dropb2)
+		#dropw2 = cm.CUDAMatrix(np.zeros(self.w2.shape))
+		#self.dmasks[0].mult(self.w2,target = dropw2)
+		#dropb2 = cm.CUDAMatrix(np.zeros(self.b2.shape))
+		#self.dmasks[1].mult(self.b2,target = dropb2)
 
-		logits = cm.exp(cm.dot(self.h,dropw2)).add(dropb2)
+		logits = cm.exp(cm.dot(self.h,self.w2)).add(self.b2)
 		self.output = logits.mult_by_col(cm.pow(cm.sum(logits,axis=1),-1))
 		self.inputs.append(x)
 		self.outputs.append(self.output)
@@ -68,19 +68,15 @@ class lstm(object):
 			hid.prev_states.append(cm.CUDAMatrix(np.zeros(hid.prev_states[-1].shape)))
 			hid.prev_gates.append(cm.CUDAMatrix(np.zeros(hid.prev_gates[-1].shape)))
 			hid.prev_fgates.append(cm.CUDAMatrix(np.zeros(hid.prev_fgates[-1].shape)))
-	
-		#print(t.shape[0],len(self.outputs),len(self.inputs),len(self.hidden_layer.prev_outputs),len(self.hidden_layer.prev_states),len(self.hidden_layer.prev_ac))
-		
+
 		for _ in range(len(t)-1,-1,-1):	
 			#print('Delta',self.delta.asarray())
 			self.outputs[_+1].subtract(t[_],target=self.gOutput)
-			self.clip(self.gw2.add_dot(self.hidden_layers[-1].prev_outputs[_+1].T,self.gOutput).mult(self.dmasks[0]))
-			self.clip(self.gb2.add_sums(self.gOutput,axis=0).mult(self.dmasks[1]))
+			self.clip(self.gw2.add_dot(self.hidden_layers[-1].prev_outputs[_+1].T,self.gOutput))
+			self.clip(self.gb2.add_sums(self.gOutput,axis=0))
 
-			dropw2 = cm.CUDAMatrix(np.zeros(self.w2.shape))
-			self.dmasks[0].mult(self.w2,target = dropw2)
 
-			self.delta = cm.dot(self.gOutput,dropw2.T)
+			self.delta = cm.dot(self.gOutput,self.w2.T)
 			self.clip(self.delta)
 			for hid in reversed(self.hidden_layers):
 				hid.backward(self.delta,_+1)
@@ -112,7 +108,7 @@ class lstm(object):
 			#print(seq_len)
 			for seq in range(len(ds)-1):
 				#print('seq',seq)
-				#self.new_dropout()
+				
 				x = ds[seq]
 				targets = []
 				for t in range(len(x)):
@@ -147,7 +143,7 @@ class lstm(object):
 
 	def reset_activations(self):
 		#print("MAIN RESET")
-		self.dmasks = [cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.w2.shape)),cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.b2.shape))]
+		#self.dmasks = [cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.w2.shape)),cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.b2.shape))]
 		self.output = cm.CUDAMatrix(np.zeros([1,self.layers[-1]]))
 		self.outputs = [cm.CUDAMatrix(np.zeros([1,self.layers[-1]]))]
 		self.h = cm.CUDAMatrix(np.zeros([1,self.layers[-2]]))
@@ -155,16 +151,6 @@ class lstm(object):
 		self.inputs=[cm.CUDAMatrix(np.zeros([1,self.layers[0]]))]
 		for hid in self.hidden_layers:
 			hid.reset_activations()
-
-	def dropout(self,param,p=0.8):
-		retval = None
-		if param in self.dropout_keys:
-			retval = param.mult(self.dropout_keys[param])
-		else:
-			mask = cm.CUDAMatrix(np.random.binomial(n=1,p=p,size=param.shape))
-			self.dropout_keys[param] = mask
-			retval = param.mult(mask)
-		return retval
 
 	def forget(self):
 		self.reset_grads()
@@ -213,12 +199,12 @@ class lstm_layer(object):
 
 		temp = cm.CUDAMatrix(np.zeros((1,self.layers[1])))
 
-		drop_i_IFOG = cm.CUDAMatrix(np.zeros(self.i_IFOG.shape))
-		self.dmasks[0].mult(self.i_IFOG,target=drop_i_IFOG)
-		drop_hm1_IFOG = cm.CUDAMatrix(np.zeros(self.hm1_IFOG.shape))
-		self.dmasks[1].mult(self.hm1_IFOG,target=drop_hm1_IFOG)
+		#drop_i_IFOG = cm.CUDAMatrix(np.zeros(self.i_IFOG.shape))
+		#self.dmasks[0].mult(self.i_IFOG,target=drop_i_IFOG)
+		#drop_hm1_IFOG = cm.CUDAMatrix(np.zeros(self.hm1_IFOG.shape))
+		#self.dmasks[1].mult(self.hm1_IFOG,target=drop_hm1_IFOG)
 
-		gates = cm.dot(x,drop_i_IFOG).add(cm.dot(self.prev_outputs[-1],drop_hm1_IFOG))
+		gates = cm.dot(x,self.i_IFOG).add(cm.dot(self.prev_outputs[-1],self.hm1_IFOG))
 		self.prev_gates.append(gates)
 		cm.sigmoid(gates)
 
@@ -312,9 +298,9 @@ class lstm_layer(object):
 		self.clip(ggates)
 		self.prev_ggates.append(ggates)
 
-		drop_i_IFOG = cm.CUDAMatrix(np.zeros(self.i_IFOG.shape))
-		self.dmasks[0].mult(self.i_IFOG,target=drop_i_IFOG)
-		self.gradInput = cm.dot(ggates,drop_i_IFOG.T)
+		#drop_i_IFOG = cm.CUDAMatrix(np.zeros(self.i_IFOG.shape))
+		#self.dmasks[0].mult(self.i_IFOG,target=drop_i_IFOG)
+		self.gradInput = cm.dot(ggates,self.i_IFOG.T)
 		self.clip(self.gradInput)
 
 		#Accumulate Gradients
@@ -338,8 +324,8 @@ class lstm_layer(object):
 		dho.add_dot(self.prev_outputs[t-1].T,go)
 		dhg.add_dot(self.prev_outputs[t-1].T,gg)
 
-		self.clip(self.gi_IFOG.mult(self.dmasks[0]))
-		self.clip(self.ghm1_IFOG.mult(self.dmasks[1]))
+		self.clip(self.gi_IFOG)
+		self.clip(self.ghm1_IFOG)
 
 	def clip(self,param):
 		norm = param.euclid_norm()
@@ -359,7 +345,7 @@ class lstm_layer(object):
 
 	def reset_activations(self):
 		#print('RESETTING')
-		self.dmasks = [cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.i_IFOG.shape)),cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.hm1_IFOG.shape))]
+		#self.dmasks = [cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.i_IFOG.shape)),cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.hm1_IFOG.shape))]
 		self.prev_states = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
 		self.prev_outputs =[cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
 		self.prev_gates =[cm.CUDAMatrix(np.zeros([1,self.layers[1]*4]))]
@@ -404,7 +390,7 @@ for x in sequences:
 #print(ds[0][0][1])
 
 n_tokens = enc.classes_.shape[0]
-net = lstm([n_tokens,700,700,700,n_tokens])
+net = lstm([n_tokens,700,700,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
