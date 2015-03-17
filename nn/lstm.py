@@ -91,7 +91,7 @@ class lstm(object):
 		self.forget()
 
 
-	def train(self,ds,epochs,enc,batch_size=10,lr=0.05,decay=0.99):
+	def train(self,ds,epochs,enc,batch_size=10,lr=0.001,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr/batch_size
 		self.last_best_acc = 0
@@ -103,6 +103,7 @@ class lstm(object):
 			#print(seq_len)
 			for seq in range(len(ds)-1):
 				#print('seq',seq)
+				#self.new_dropout()
 				x = ds[seq]
 				targets = []
 				for t in range(len(x)):
@@ -144,6 +145,9 @@ class lstm(object):
 		self.inputs=[cm.CUDAMatrix(np.zeros([1,self.layers[0]]))]
 		for hid in self.hidden_layers:
 			hid.reset_activations()
+
+	def new_dropout(self,param,p=0.8):
+		return cm.CUDAMatrix(np.random.binomial(n=1,p=p,size=param.shape))
 
 	def forget(self):
 		self.reset_grads()
@@ -352,7 +356,7 @@ class lstm_layer(object):
 
 ds = []
 print('Loading Text')
-with open('../data/ptb.train.short.txt') as doc:
+with open('../data/ptb.train.txt') as doc:
 	f = doc.read()
 	words = f.split(' ')
 	sequences = f.split('\n')
