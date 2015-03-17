@@ -73,7 +73,7 @@ class lstm(object):
 
 			self.delta = cm.dot(self.gOutput,self.w2.T)
 			self.clip(self.delta)
-			for hid in self.hidden_layers:
+			for hid in reversed(self.hidden_layers):
 				hid.backward(self.delta,_+1)
 				self.delta = hid.gradInput
 
@@ -130,17 +130,17 @@ class lstm(object):
 
 
 	def reset_grads(self):
-		self.gw2 = cm.CUDAMatrix(np.zeros([self.layers[1],self.layers[2]]))
-		self.gb2 = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
-		self.gOutput = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
-		self.delta = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		self.gw2 = cm.CUDAMatrix(np.zeros([self.layers[-2],self.layers[-1]]))
+		self.gb2 = cm.CUDAMatrix(np.zeros([1,self.layers[-1]]))
+		self.gOutput = cm.CUDAMatrix(np.zeros([1,self.layers[-1]]))
+		self.delta = cm.CUDAMatrix(np.zeros([1,self.layers[-2]]))
 
 	def reset_activations(self):
 		#print("MAIN RESET")
-		self.output = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
-		self.outputs = [cm.CUDAMatrix(np.zeros([1,self.layers[2]]))]
-		self.h = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.hs = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
+		self.output = cm.CUDAMatrix(np.zeros([1,self.layers[-1]]))
+		self.outputs = [cm.CUDAMatrix(np.zeros([1,self.layers[-1]]))]
+		self.h = cm.CUDAMatrix(np.zeros([1,self.layers[-2]]))
+		self.hs = [cm.CUDAMatrix(np.zeros([1,self.layers[-1]]))]
 		self.inputs=[cm.CUDAMatrix(np.zeros([1,self.layers[0]]))]
 		for hid in self.hidden_layers:
 			hid.reset_activations()
@@ -376,7 +376,7 @@ for x in sequences:
 #print(ds[0][0][1])
 
 n_tokens = enc.classes_.shape[0]
-net = lstm([n_tokens,800,n_tokens])
+net = lstm([n_tokens,700,700,700,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
