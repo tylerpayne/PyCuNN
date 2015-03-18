@@ -90,7 +90,7 @@ class lstm(object):
 		self.forget()
 
 
-	def train(self,ds,epochs,enc,batch_size=1,lr=0.01,decay=0.99):
+	def train(self,ds,epochs,enc,batch_size=100,lr=0.001,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr/batch_size
 		self.last_best_acc = 0
@@ -335,7 +335,6 @@ class lstm_layer(object):
 
 	def reset_activations(self):
 		#print('RESETTING')
-		#self.dmasks = [cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.i_IFOG.shape)),cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.hm1_IFOG.shape))]
 		self.prev_states = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
 		self.prev_outputs =[cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
 		self.prev_gates =[cm.CUDAMatrix(np.zeros([1,self.layers[1]*4]))]
@@ -345,7 +344,6 @@ class lstm_layer(object):
 		self.gradInput = cm.CUDAMatrix(np.zeros([1,self.layers[0]]))
 
 		self.prev_es = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))] 
-		#self.prev_gradInput = [cm.CUDAMatrix(np.zeros([1,self.layers[0]]))]
 
 	def reset_grads(self):
 		#print('Resetting Grads')
