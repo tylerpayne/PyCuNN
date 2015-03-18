@@ -49,11 +49,6 @@ class lstm(object):
 		for hid in self.hidden_layers:
 			self.h = hid.forward(self.h)
 
-		#dropw2 = cm.CUDAMatrix(np.zeros(self.w2.shape))
-		#self.dmasks[0].mult(self.w2,target = dropw2)
-		#dropb2 = cm.CUDAMatrix(np.zeros(self.b2.shape))
-		#self.dmasks[1].mult(self.b2,target = dropb2)
-
 		logits = cm.exp(cm.dot(self.h,self.w2)).add(self.b2)
 		self.output = logits.mult_by_col(cm.pow(cm.sum(logits,axis=1),-1))
 		self.inputs.append(x)
@@ -74,7 +69,6 @@ class lstm(object):
 			self.outputs[_+1].subtract(t[_],target=self.gOutput)
 			self.clip(self.gw2.add_dot(self.hidden_layers[-1].prev_outputs[_+1].T,self.gOutput))
 			self.clip(self.gb2.add_sums(self.gOutput,axis=0))
-
 
 			self.delta = cm.dot(self.gOutput,self.w2.T)
 			self.clip(self.delta)
@@ -196,31 +190,26 @@ class lstm_layer(object):
 
 		temp = cm.CUDAMatrix(np.zeros((1,self.layers[1])))
 
-		#drop_i_IFOG = cm.CUDAMatrix(np.zeros(self.i_IFOG.shape))
-		#self.dmasks[0].mult(self.i_IFOG,target=drop_i_IFOG)
-		#drop_hm1_IFOG = cm.CUDAMatrix(np.zeros(self.hm1_IFOG.shape))
-		#self.dmasks[1].mult(self.hm1_IFOG,target=drop_hm1_IFOG)
-
 		gates = cm.dot(x,self.i_IFOG).add(cm.dot(self.prev_outputs[-1],self.hm1_IFOG))
 		self.prev_gates.append(gates)
 
-		i = gates.get_col_slice(0,self.layers[1])
-		f = gates.get_col_slice(self.layers[1],self.layers[1]*2)
-		o = gates.get_col_slice(self.layers[1]*2,self.layers[1]*3)
+		ifo = gates.get_col_slice(0,self.layers[1]*3)
 		g = gates.get_col_slice(self.layers[1]*3,self.layers[1]*4)
 
-		cm.sigmoid(i)
-		cm.sigmoid(f)
-		cm.sigmoid(o)
+		cm.sigmoid(ifo)
 		cm.tanh(g)
 
+		i = ifo.get_col_slice(0,self.layers[1])
+		f = ifo.get_col_slice(self.layers[1],self.layers[1]*2)
+		o = ifo.get_col_slice(self.layers[1]*2,self.layers[1]*3)
+		
 		states = cm.CUDAMatrix(np.zeros((1,self.layers[1])))
 		i.mult(g,target = states)
 		f.mult(self.prev_states[-1],target = temp)
 		states.add(temp)
 
 		self.output = cm.CUDAMatrix(np.zeros((1,self.layers[1])))
-		cm.tanh(states,target=self.output)
+		cm.tanh(states,target = self.output)
 		self.output.mult(o)
 
 		self.prev_outputs.append(self.output)
@@ -260,7 +249,8 @@ class lstm_layer(object):
 
 		#Loss wrt Cell State
 		temp = cm.CUDAMatrix(np.ones(s.shape))
-		es = temp.subtract(cm.pow(cm.tanh(s),2))
+		es = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		temp.subtract(cm.pow(cm.tanh(s),2),target=es)
 		es.mult(fo).mult(ec)
 		ff_tp1.mult(es_tp1,target=temp)
 		es.add(temp)
@@ -300,8 +290,6 @@ class lstm_layer(object):
 		self.clip(ggates)
 		self.prev_ggates.append(ggates)
 
-		#drop_i_IFOG = cm.CUDAMatrix(np.zeros(self.i_IFOG.shape))
-		#self.dmasks[0].mult(self.i_IFOG,target=drop_i_IFOG)
 		self.gradInput = cm.dot(ggates,self.i_IFOG.T)
 		self.clip(self.gradInput)
 
