@@ -166,8 +166,6 @@ class lstm(object):
 		for hid in range(len(self.hidden_layers)-1):
 			self.hidden_layers[hid].i_IFOG = cm.CUDAMatrix(self.last_best_model[hid])
 			self.hidden_layers[hid].hm1_IFOG = cm.CUDAMatrix(self.last_best_model[hid+1])
-			del self.last_best_model[0]
-			del self.last_best_model[1]
 
 		
 class lstm_layer(object):
