@@ -108,7 +108,6 @@ class lstm(object):
 			#print(seq_len)
 			for seq in range(len(ds)-1):
 				#print('seq',seq)
-				
 				x = ds[seq]
 				targets = []
 				for t in range(len(x)):
@@ -204,20 +203,24 @@ class lstm_layer(object):
 
 		gates = cm.dot(x,self.i_IFOG).add(cm.dot(self.prev_outputs[-1],self.hm1_IFOG))
 		self.prev_gates.append(gates)
-		cm.sigmoid(gates)
 
 		i = gates.get_col_slice(0,self.layers[1])
 		f = gates.get_col_slice(self.layers[1],self.layers[1]*2)
 		o = gates.get_col_slice(self.layers[1]*2,self.layers[1]*3)
 		g = gates.get_col_slice(self.layers[1]*3,self.layers[1]*4)
 
+		cm.sigmoid(i)
+		cm.sigmoid(f)
+		cm.sigmoid(o)
+		cm.tanh(g)
+
 		states = cm.CUDAMatrix(np.zeros((1,self.layers[1])))
 		i.mult(g,target = states)
-		f.mult(self.prev_states[-1],target=temp)
+		f.mult(self.prev_states[-1],target = temp)
 		states.add(temp)
 
 		self.output = cm.CUDAMatrix(np.zeros((1,self.layers[1])))
-		cm.sigmoid(states,target=self.output)
+		cm.tanh(states,target=self.output)
 		self.output.mult(o)
 
 		self.prev_outputs.append(self.output)
@@ -256,20 +259,21 @@ class lstm_layer(object):
 		ec.add(grad).add(recurrentGrad)
 
 		#Loss wrt Cell State
-		es = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		fo.mult(ec,target = es)
-		cl.mult_by_sigmoid_deriv(es,s)
+		temp = cm.CUDAMatrix(np.ones(s.shape))
+		es = temp.subtract(cm.pow(cm.tanh(s),2))
+		es.mult(fo).mult(ec)
 		ff_tp1.mult(es_tp1,target=temp)
 		es.add(temp)
 
 		#Gradient at Output Gates
 		go = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		cm.sigmoid(s,target = go)
+		cm.tanh(s,target = go)
 		cl.mult_by_sigmoid_deriv(go,o)
 		go.mult(ec)
 
 		#Gradient at Cell Input
-		gg = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		temp = cm.CUDAMatrix(np.ones(s.shape))
+		gg = temp.subtract(cm.pow(cm.tanh(g),2))
 		fi.mult(es,target=gg)
 		cl.mult_by_sigmoid_deriv(gg,g)
 
@@ -280,7 +284,7 @@ class lstm_layer(object):
 
 		#Gradient at Input Gate
 		gi = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		cm.sigmoid(g,target=gi)
+		cm.tanh(g,target=gi)
 		gi.mult(es)
 		cl.mult_by_sigmoid_deriv(gi,i)
 
