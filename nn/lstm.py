@@ -48,7 +48,6 @@ class lstm(object):
 		self.h = x
 		for hid in self.hidden_layers:
 			self.h = hid.forward(self.h)
-
 		logits = cm.exp(cm.dot(self.h,self.w2)).add(self.b2)
 		self.output = logits.mult_by_col(cm.pow(cm.sum(logits,axis=1),-1))
 		self.inputs.append(x)
@@ -90,7 +89,7 @@ class lstm(object):
 		self.forget()
 
 
-	def train(self,ds,epochs,enc,batch_size=1,lr=0.1,decay=0.99):
+	def train(self,ds,epochs,enc,batch_size=1,lr=0.05,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr/batch_size
 		self.last_best_acc = 0
@@ -378,7 +377,7 @@ for x in sequences:
 #print(ds[0][0][1])
 
 n_tokens = enc.classes_.shape[0]
-net = lstm([n_tokens,700,700,n_tokens])
+net = lstm([n_tokens,700,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
