@@ -10,7 +10,7 @@ cm.shutdown()
 cm.init()
 
 class lstm(object):
-	def __init__(self, layers,uplim=100,lowlim=-100):
+	def __init__(self, layers,uplim=15,lowlim=-15):
 		super(lstm, self).__init__()
 		
 		self.layers = layers
@@ -22,7 +22,7 @@ class lstm(object):
 
 		#LSTM Layer
 
-		self.hidden_layer = lstm_layer(layers,self.uplim,self.lowlim)
+		self.hidden_layer = lstm_layer(layers,uplim=self.uplim,lowlim=self.lowlim)
 
 		#Hidden to Output Weights
 
@@ -62,9 +62,11 @@ class lstm(object):
 			self.outputs[_+1].subtract(t[_],target=self.gOutput)
 			self.gw2.add_dot(self.hidden_layer.prev_outputs[_+1].T,self.gOutput)
 			self.gb2.add_sums(self.gOutput,axis=0)
+			self.clip(self.gw2)
+			self.clip(self.gb2)
 
 			self.delta = cm.dot(self.gOutput,self.w2.T)
-			#self.clip(self.delta)
+			self.clip(self.delta)
 			self.hidden_layer.backward(self.delta,_+1)
 
 	def clip(self,param):
@@ -80,7 +82,7 @@ class lstm(object):
 		self.forget()
 
 
-	def train(self,ds,epochs,enc,batch_size=1,lr=0.1,decay=0.99):
+	def train(self,ds,epochs,enc,batch_size=10,lr=0.01,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr/batch_size
 		self.last_best_acc = 0
@@ -355,8 +357,8 @@ class lstm_layer(object):
 		dho.add_dot(self.prev_outputs[t-1].T,go)
 		dhg.add_dot(self.prev_outputs[t-1].T,gg)
 
-		#self.clip(self.gi_IFOG)
-		#self.clip(self.ghm1_IFOG)
+		self.clip(self.gi_IFOG)
+		self.clip(self.ghm1_IFOG)
 		#print(self.gi_IFOG.asarray())
 		#print(self.ghm1_IFOG.asarray())
 
@@ -425,7 +427,7 @@ net = lstm([n_tokens,700,n_tokens])
 
 start = timeit.timeit()
 print('Starting Training')
-net.train(ds,25,enc)
+net.train(ds,5,enc)
 print('Time:',start)
 
 net.last_best()
