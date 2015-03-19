@@ -80,7 +80,7 @@ class lstm(object):
 		self.forget()
 
 
-	def train(self,ds,epochs,enc,batch_size=1,lr=0.05,decay=0.99):
+	def train(self,ds,epochs,enc,batch_size=1,lr=0.1,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr/batch_size
 		self.last_best_acc = 0
@@ -109,7 +109,7 @@ class lstm(object):
 					self.last_best_model.append(self.hidden_layer.hm1_IFOG.asarray())
 				self.bptt(targets)
 				if seq % batch_size == 0:
-					#print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1][0].asarray()),'Target',enc.inverse_transform(targets[-1].asarray()))
+					print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1][0].asarray()),'Target',enc.inverse_transform(targets[-1].asarray()))
 					#print('gw2',self.gw2.asarray(),'gb2',self.gb2.asarray(),'iifog',cm.sum(self.hidden_layer.gi_IFOG,axis=1).sum(axis=0).asarray(),'hifog',self.hidden_layer.hm1_IFOG.asarray())
 					self.updateWeights()
 					#self.lr = self.lr * decay
@@ -239,9 +239,9 @@ class lstm_layer(object):
 		cm.sigmoid(ifo)
 		cm.tanh(g)
 
-		i = ifo.get_col_slice(0,self.layers[1])
-		f = ifo.get_col_slice(self.layers[1],self.layers[1]*2)
-		o = ifo.get_col_slice(self.layers[1]*2,self.layers[1]*3)
+		i = gates.get_col_slice(0,self.layers[1])
+		f = gates.get_col_slice(self.layers[1],self.layers[1]*2)
+		o = gates.get_col_slice(self.layers[1]*2,self.layers[1]*3)
 		
 		states = cm.CUDAMatrix(np.zeros((1,self.layers[1])))
 		i.mult(g,target = states)
