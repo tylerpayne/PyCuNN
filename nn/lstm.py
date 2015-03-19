@@ -82,7 +82,7 @@ class lstm(object):
 		self.forget()
 
 
-	def train(self,ds,epochs,enc,batch_size=10,lr=0.01,decay=0.99):
+	def train(self,ds,epochs,enc,batch_size=1,lr=0.1,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr/batch_size
 		self.last_best_acc = 0
@@ -100,7 +100,9 @@ class lstm(object):
 					count += 1
 					self.forward(x[t][0])
 					targets.append(x[t][1])
-					if x[t][1].argmax(axis=1).asarray()[0][0] == self.outputs[-1].argmax(axis=0).asarray()[0][0]:
+					print(x[t][1].argmax(axis=1).asarray()[0][0])
+					print(self.outputs[-1].argmax(axis=1).asarray()[0][0])
+					if x[t][1].argmax(axis=1).asarray()[0][0] == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
 						correct += 1
 				#print(targets)
 				acc = float(correct)/float(count)
@@ -111,10 +113,11 @@ class lstm(object):
 					self.last_best_model.append(self.hidden_layer.hm1_IFOG.asarray())
 				self.bptt(targets)
 				if seq % batch_size == 0:
-					print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1][0].asarray()),'Target',enc.inverse_transform(targets[-1].asarray()))
+					#print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1][0].asarray()),'Target',enc.inverse_transform(targets[-1].asarray()))
 					#print('gw2',self.gw2.asarray(),'gb2',self.gb2.asarray(),'iifog',cm.sum(self.hidden_layer.gi_IFOG,axis=1).sum(axis=0).asarray(),'hifog',self.hidden_layer.hm1_IFOG.asarray())
 					self.updateWeights()
-					#self.lr = self.lr * decay
+				if (seq % 10 == 0) and (self.lr > 0.005):
+					self.lr = self.lr * decay
 				self.reset_activations()
 			
 			print('Trained Epoch:',epoch+1,"With Accuracy:",acc)
@@ -369,8 +372,8 @@ class lstm_layer(object):
 
 	def updateWeights(self,lr):
 		#self.clip(self.ghm1_IFOG)
-		print(self.i_IFOG.subtract(self.gi_IFOG.mult(lr).add(self.updates_tm1[0].mult(0.9))).asarray())
-		print(self.hm1_IFOG.subtract(self.ghm1_IFOG.mult(lr).add(self.updates_tm1[1].mult(0.9))).asarray())
+		self.i_IFOG.subtract(self.gi_IFOG.mult(lr).add(self.updates_tm1[0].mult(0.9)))
+		self.hm1_IFOG.subtract(self.ghm1_IFOG.mult(lr).add(self.updates_tm1[1].mult(0.9)))
 		self.updates_tm1 = [self.gi_IFOG,self.ghm1_IFOG]
 		#print(self.i_IFOG.asarray())
 
@@ -430,7 +433,7 @@ print('Starting Training')
 net.train(ds,25,enc)
 print('Time:',start)
 
-net.last_best()
+#net.last_best()
 
 net.forget()
 sent = [enc.inverse_transform(ds[0][12][0].asarray())]
