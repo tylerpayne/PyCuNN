@@ -65,7 +65,7 @@ class lstm(object):
 
 			self.delta = cm.dot(self.gOutput,self.w2.T)
 			self.clip(self.delta)
-			self.hidden_layer.backward(self.delta)
+			self.hidden_layer.backward(self.delta,_+1)
 
 	def clip(self,param):
 		norm = param.euclid_norm()
