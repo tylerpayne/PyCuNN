@@ -22,10 +22,7 @@ class lstm(object):
 
 		#LSTM Layer
 
-		self.hidden_layers = []
-
-		for t in range(len(layers)-2):
-			self.hidden_layers.append(lstm_layer(layers[t:t+3],self.uplim,self.lowlim))
+		self.hidden_layer = lstm_layer(layers,self.uplim,self.lowlim))
 
 		#Hidden to Output Weights
 
@@ -45,9 +42,7 @@ class lstm(object):
 		self.updates_tm1 = [self.gw2,self.gb2]
 
 	def forward(self,x):
-		self.h = x
-		for hid in self.hidden_layers:
-			self.h = hid.forward(self.h)
+		self.h = self.hidden_layer.forward(x)
 		logits = cm.exp(cm.dot(self.h,self.w2)).add(self.b2)
 		self.output = logits.mult_by_col(cm.pow(cm.sum(logits,axis=1),-1))
 		self.inputs.append(x)
@@ -57,11 +52,10 @@ class lstm(object):
 	def bptt(self,t):
 		#print('bptt')
 		#Set T+1 activations to 0
-		for hid in self.hidden_layers:
-			hid.prev_outputs.append(cm.CUDAMatrix(np.zeros(hid.prev_outputs[-1].shape)))
-			hid.prev_states.append(cm.CUDAMatrix(np.zeros(hid.prev_states[-1].shape)))
-			hid.prev_gates.append(cm.CUDAMatrix(np.zeros(hid.prev_gates[-1].shape)))
-			hid.prev_fgates.append(cm.CUDAMatrix(np.zeros(hid.prev_fgates[-1].shape)))
+		self.hidden_layer.prev_outputs.append(cm.CUDAMatrix(np.zeros(self.hidden_layer.prev_outputs[-1].shape)))
+		self.hidden_layer.prev_states.append(cm.CUDAMatrix(np.zeros(self.hidden_layer.prev_states[-1].shape)))
+		self.hidden_layer.prev_gates.append(cm.CUDAMatrix(np.zeros(self.hidden_layer.prev_gates[-1].shape)))
+		self.hidden_layer.prev_fgates.append(cm.CUDAMatrix(np.zeros(self.hidden_layer.prev_fgates[-1].shape)))
 
 		for _ in range(len(t)-1,-1,-1):	
 			#print('Delta',self.delta.asarray())
@@ -71,9 +65,7 @@ class lstm(object):
 
 			self.delta = cm.dot(self.gOutput,self.w2.T)
 			self.clip(self.delta)
-			for hid in reversed(self.hidden_layers):
-				hid.backward(self.delta,_+1)
-				self.delta = hid.gradInput
+			self.hidden_layer.backward(self.delta)
 
 	def clip(self,param):
 		norm = param.euclid_norm()
@@ -83,8 +75,7 @@ class lstm(object):
 	def updateWeights(self):
 		self.w2.subtract(self.gw2.mult(self.lr).add(self.updates_tm1[0].mult(0.9)))
 		self.b2.subtract(self.gb2.mult(self.lr).add(self.updates_tm1[1].mult(0.9)))
-		for hid in self.hidden_layers:
-			hid.updateWeights(self.lr)
+		self.hidden_layer.updateWeights(self.lr)
 		self.updates_tm1 = [self.gw2,self.gb2]
 		self.forget()
 
@@ -114,9 +105,8 @@ class lstm(object):
 				if acc > self.last_best_acc:
 					self.last_best_acc = acc
 					self.last_best_model = [self.w2.asarray(),self.b2.asarray()]
-					for hid in self.hidden_layers:
-						self.last_best_model.append(hid.i_IFOG.asarray())
-						self.last_best_model.append(hid.hm1_IFOG.asarray())
+					self.last_best_model.append(self.hidden_layer.i_IFOG.asarray())
+					self.last_best_model.append(self.hidden_layer.hm1_IFOG.asarray())
 				self.bptt(targets)
 				if seq % batch_size == 0:
 					#print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1][0].asarray()),'Target',enc.inverse_transform(targets[-1].asarray()))
@@ -141,23 +131,18 @@ class lstm(object):
 		self.h = cm.CUDAMatrix(np.zeros([1,self.layers[-2]]))
 		self.hs = [cm.CUDAMatrix(np.zeros([1,self.layers[-1]]))]
 		self.inputs=[cm.CUDAMatrix(np.zeros([1,self.layers[0]]))]
-		for hid in self.hidden_layers:
-			hid.reset_activations()
+		self.hidden_layer.reset_activations()
 
 	def forget(self):
 		self.reset_grads()
 		self.reset_activations()
-		for hid in self.hidden_layers:
-			hid.forget()
+		self.hidden_layer.forget()
 
 	def last_best(self):
 		self.w2 = cm.CUDAMatrix(self.last_best_model[0])
 		self.b2 = cm.CUDAMatrix(self.last_best_model[1])
-		del self.last_best_model[0]
-		del self.last_best_model[1]
-		for hid in range(len(self.hidden_layers)-1):
-			self.hidden_layers[hid].i_IFOG = cm.CUDAMatrix(self.last_best_model[hid])
-			self.hidden_layers[hid].hm1_IFOG = cm.CUDAMatrix(self.last_best_model[hid+1])
+		self.hidden_layer.i_IFOG = cm.CUDAMatrix(self.last_best_model[2])
+		self.hidden_layer.hm1_IFOG = cm.CUDAMatrix(self.last_best_model[3])
 
 		
 class lstm_layer(object):
