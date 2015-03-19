@@ -100,8 +100,6 @@ class lstm(object):
 					count += 1
 					self.forward(x[t][0])
 					targets.append(x[t][1])
-					print(x[t][1].argmax(axis=1).asarray()[0][0])
-					print(self.outputs[-1].argmax(axis=1).asarray()[0][0])
 					if x[t][1].argmax(axis=1).asarray()[0][0] == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
 						correct += 1
 				#print(targets)
