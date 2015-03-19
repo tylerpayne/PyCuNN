@@ -98,7 +98,7 @@ class lstm(object):
 					count += 1
 					self.forward(x[t][0])
 					targets.append(x[t][1])
-					if x[t][1].argmax(axis=1).asarray()[0][0] == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
+					if x[t][1].argmax(axis=1).asarray()[0][0] == self.outputs[-1].argmax(axis=0).asarray()[0][0]:
 						correct += 1
 				#print(targets)
 				acc = float(correct)/float(count)
@@ -110,6 +110,7 @@ class lstm(object):
 				self.bptt(targets)
 				if seq % batch_size == 0:
 					#print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1][0].asarray()),'Target',enc.inverse_transform(targets[-1].asarray()))
+					#print('gw2',self.gw2.asarray(),'gb2',self.gb2.asarray(),'iifog',cm.sum(self.hidden_layer.gi_IFOG,axis=1).sum(axis=0).asarray(),'hifog',self.hidden_layer.hm1_IFOG.asarray())
 					self.updateWeights()
 					#self.lr = self.lr * decay
 				self.reset_activations()
@@ -144,6 +145,61 @@ class lstm(object):
 		self.hidden_layer.i_IFOG = cm.CUDAMatrix(self.last_best_model[2])
 		self.hidden_layer.hm1_IFOG = cm.CUDAMatrix(self.last_best_model[3])
 
+	def gradient_checking(self,ds,epochs,enc,batch_size=1,lr=0.05,decay=0.99):
+		self.lr = lr/batch_size
+		self.last_best_acc = 0
+		acc = 0
+		e= 0.001
+		for epoch in range(epochs):
+			correct = 0
+			count = 0
+			#print(seq_len)
+			for seq in range(1000):
+				#print('seq',seq)
+				x = ds[seq][0][0]
+				targets = [ds[seq][0][1]]
+				count += 1
+				self.forward(x)
+				#if x.argmax(axis=1).asarray()[0][0] == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
+					#correct += 1
+				#print(targets)
+				#acc = float(correct)/float(count)
+				self.bptt(targets)
+				gvals = [self.gw2.asarray(),self.gb2.asarray(),self.hidden_layer.gi_IFOG.asarray(),self.hidden_layer.ghm1_IFOG.asarray()]
+				self.forget()
+
+				#self.w2.add(e)
+				#self.hidden_layer.i_IFOG.add(e)
+				self.hidden_layer.hm1_IFOG.add(e)
+
+				self.forward(x)
+
+				plus_loss = cm.CUDAMatrix(np.zeros(self.outputs[-1].shape))
+				targets[0].mult(cm.log(self.outputs[-1]),target = plus_loss)
+
+				self.forget()
+
+				#self.w2.subtract(e)
+				#self.hidden_layer.i_IFOG.subtract(e)
+				self.hidden_layer.hm1_IFOG.subtract(e)
+
+				self.forward(x)
+
+				minus_loss = cm.CUDAMatrix(np.zeros(self.outputs[-1].shape))
+				targets[0].mult(cm.log(self.outputs[-1]),target = minus_loss)
+
+				grads = plus_loss.subtract(minus_loss).mult(1./float(2*e))
+
+				print('Grads',grads.asarray().argmax())
+				print('gval', gvals[3].argmax())
+
+				if seq % batch_size == 0:
+					#print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1][0].asarray()),'Target',enc.inverse_transform(targets[-1].asarray()))
+					self.updateWeights()
+					#self.lr = self.lr * decay
+				self.reset_activations()
+			
+			print('Trained Epoch:',epoch+1,"With Accuracy:",acc)
 		
 class lstm_layer(object):
 	def __init__(self, layers,uplim=1,lowlim=-1):
@@ -287,6 +343,7 @@ class lstm_layer(object):
 		di.add_dot(self.inputs[t].T,gi)
 		df.add_dot(self.inputs[t].T,gf)
 		do.add_dot(self.inputs[t].T,go)
+		dg.add_dot(self.inputs[t].T,gg)
 
 		dhi = self.ghm1_IFOG.get_col_slice(0,self.layers[1])
 		dhf = self.ghm1_IFOG.get_col_slice(self.layers[1],self.layers[1]*2)
