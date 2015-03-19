@@ -22,7 +22,7 @@ class lstm(object):
 
 		#LSTM Layer
 
-		self.hidden_layer = lstm_layer(layers,self.uplim,self.lowlim))
+		self.hidden_layer = lstm_layer(layers,self.uplim,self.lowlim)
 
 		#Hidden to Output Weights
 
