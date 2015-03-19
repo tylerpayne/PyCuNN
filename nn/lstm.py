@@ -10,7 +10,7 @@ cm.shutdown()
 cm.init()
 
 class lstm(object):
-	def __init__(self, layers,uplim=8,lowlim=-8):
+	def __init__(self, layers,uplim=100,lowlim=-100):
 		super(lstm, self).__init__()
 		
 		self.layers = layers
@@ -60,11 +60,11 @@ class lstm(object):
 		for _ in range(len(t)-1,-1,-1):	
 			#print('Delta',self.delta.asarray())
 			self.outputs[_+1].subtract(t[_],target=self.gOutput)
-			self.clip(self.gw2.add_dot(self.hidden_layer.prev_outputs[_+1].T,self.gOutput))
-			self.clip(self.gb2.add_sums(self.gOutput,axis=0))
+			self.gw2.add_dot(self.hidden_layer.prev_outputs[_+1].T,self.gOutput)
+			self.gb2.add_sums(self.gOutput,axis=0)
 
 			self.delta = cm.dot(self.gOutput,self.w2.T)
-			self.clip(self.delta)
+			#self.clip(self.delta)
 			self.hidden_layer.backward(self.delta,_+1)
 
 	def clip(self,param):
@@ -230,9 +230,8 @@ class lstm_layer(object):
 
 		temp = cm.CUDAMatrix(np.zeros((1,self.layers[1])))
 
-		gates = cm.dot(x,self.i_IFOG).add(cm.dot(self.prev_outputs[-1],self.hm1_IFOG))
+		gates = cm.dot(x,self.i_IFOG).add_dot(self.prev_outputs[-1],self.hm1_IFOG)
 		self.prev_gates.append(gates)
-
 		ifo = gates.get_col_slice(0,self.layers[1]*3)
 		g = gates.get_col_slice(self.layers[1]*3,self.layers[1]*4)
 
@@ -291,6 +290,7 @@ class lstm_layer(object):
 		temp = cm.CUDAMatrix(np.ones(s.shape))
 		es = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
 		temp.subtract(cm.pow(cm.tanh(s),2),target=es)
+		#print(es.asarray())
 		es.mult(fo).mult(ec)
 		ff_tp1.mult(es_tp1,target=temp)
 		es.add(temp)
@@ -318,7 +318,7 @@ class lstm_layer(object):
 		gi.mult(es)
 		cl.mult_by_sigmoid_deriv(gi,i)
 
-		self.clip(es)
+		#self.clip(es)
 		self.prev_es.append(es)
 
 		ggates = cm.CUDAMatrix(np.zeros((1,self.layers[1]*4)))
@@ -327,11 +327,11 @@ class lstm_layer(object):
 		ggates.set_col_slice(self.layers[1]*2,self.layers[1]*3,go)
 		ggates.set_col_slice(self.layers[1]*3,self.layers[1]*4,gg)
 
-		self.clip(ggates)
+		#self.clip(ggates)
 		self.prev_ggates.append(ggates)
 
-		self.gradInput = cm.dot(ggates,self.i_IFOG.T)
-		self.clip(self.gradInput)
+		#self.gradInput = cm.dot(ggates,self.i_IFOG.T)
+		#self.clip(self.gradInput)
 
 		#Accumulate Gradients
 
@@ -355,8 +355,10 @@ class lstm_layer(object):
 		dho.add_dot(self.prev_outputs[t-1].T,go)
 		dhg.add_dot(self.prev_outputs[t-1].T,gg)
 
-		self.clip(self.gi_IFOG)
-		self.clip(self.ghm1_IFOG)
+		#self.clip(self.gi_IFOG)
+		#self.clip(self.ghm1_IFOG)
+		#print(self.gi_IFOG.asarray())
+		#print(self.ghm1_IFOG.asarray())
 
 	def clip(self,param):
 		norm = param.euclid_norm()
@@ -365,8 +367,8 @@ class lstm_layer(object):
 
 	def updateWeights(self,lr):
 		#self.clip(self.ghm1_IFOG)
-		self.i_IFOG.subtract(self.gi_IFOG.mult(lr).add(self.updates_tm1[0].mult(0.9)))
-		self.hm1_IFOG.subtract(self.ghm1_IFOG.mult(lr).add(self.updates_tm1[1].mult(0.9)))
+		print(self.i_IFOG.subtract(self.gi_IFOG.mult(lr).add(self.updates_tm1[0].mult(0.9))).asarray())
+		print(self.hm1_IFOG.subtract(self.ghm1_IFOG.mult(lr).add(self.updates_tm1[1].mult(0.9))).asarray())
 		self.updates_tm1 = [self.gi_IFOG,self.ghm1_IFOG]
 		#print(self.i_IFOG.asarray())
 
