@@ -82,9 +82,9 @@ class lstm(object):
 		self.forget()
 
 
-	def train(self,ds,epochs,enc,batch_size=100,lr=0.1,decay=0.99):
+	def train(self,ds,epochs,enc,batch_size=1,lr=0.1,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
-		self.lr = lr/batch_size
+		#self.lr = lr/batch_size
 		self.last_best_acc = 0
 		acc = 0
 		self.last_best_model = []
@@ -117,7 +117,7 @@ class lstm(object):
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
 				self.reset_activations()
-			sent = [enc.inverse_transform(ds[0][0][0].asarray())]
+			sent = [enc.inverse_transform(ds[10][0][0].asarray())]
 			for i in range(15):
 				x = cm.CUDAMatrix(enc.transform([sent[-1]]))
 				y = self.forward(x)
