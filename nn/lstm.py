@@ -3,7 +3,7 @@ from cudamat import learn as cl
 import numpy as np
 import copy
 from sklearn import preprocessing as prepro
-import timeit
+from timeit import default_timer as timer
 import math
 
 cm.shutdown()
@@ -90,6 +90,7 @@ class lstm(object):
 		acc = 0
 		self.last_best_model = []
 		for epoch in range(epochs):
+			start = timer()
 			correct = 0
 			count = 0
 			#print(seq_len)
@@ -110,6 +111,7 @@ class lstm(object):
 					self.last_best_model = [self.w2.asarray(),self.b2.asarray()]
 					self.last_best_model.append(self.hidden_layer.i_IFOG.asarray())
 					self.last_best_model.append(self.hidden_layer.hm1_IFOG.asarray())
+					self.lr = self.lr*decay
 				self.bptt(targets)
 				if seq % batch_size == 0:
 					#print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1][0].asarray()),'Target',enc.inverse_transform(targets[-1].asarray()))
@@ -118,13 +120,14 @@ class lstm(object):
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
 				self.reset_activations()
+			time = timer() - start
 			sent = [enc.inverse_transform(ds[10][0][0].asarray())]
 			for i in range(15):
 				x = cm.CUDAMatrix(enc.transform([sent[-1]]))
 				y = self.forward(x)
 				sent.append(enc.inverse_transform(y.asarray())[0])
 			self.forget()
-			print('Trained Epoch:',epoch+1,"With Accuracy:",acc,'Learning Rate:',self.lr)
+			print('Trained Epoch:',epoch+1,"With Accuracy:",acc, 'in', time, 'seconds', 'Learning Rate:',self.lr)
 			print('Generated Sentence:',sent)
 
 
@@ -161,6 +164,7 @@ class lstm(object):
 		acc = 0
 		e= 0.001
 		for epoch in range(epochs):
+
 			correct = 0
 			count = 0
 			#print(seq_len)
@@ -432,12 +436,13 @@ for x in sequences:
 n_tokens = enc.classes_.shape[0]
 net = lstm([n_tokens,700,n_tokens])
 
-start = timeit.timeit()
+start = timer()
 print('Starting Training')
 net.train(ds,100,enc)
-print('Time:',start)
+time  = timer() - start
+print('Time:',time)
 
-#net.last_best()
+net.last_best()
 
 net.forget()
 sent = [enc.inverse_transform(ds[0][12][0].asarray())]
