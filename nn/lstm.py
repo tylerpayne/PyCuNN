@@ -117,8 +117,14 @@ class lstm(object):
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
 				self.reset_activations()
-			
+			sent = [enc.inverse_transform(ds[0][0][0].asarray())]
+			for i in range(15):
+				x = cm.CUDAMatrix(enc.transform([sent[-1]]))
+				y = self.forward(x)
+				sent.append(enc.inverse_transform(y.asarray())[0])
+			self.forget()
 			print('Trained Epoch:',epoch+1,"With Accuracy:",acc,'Learning Rate:',self.lr)
+			print('Generated Sentence:',sent)
 
 
 	def reset_grads(self):
@@ -201,8 +207,7 @@ class lstm(object):
 					self.updateWeights()
 					#self.lr = self.lr * decay
 				self.reset_activations()
-			
-			print('Trained Epoch:',epoch+1,"With Accuracy:",acc)
+
 		
 class lstm_layer(object):
 	def __init__(self, layers,uplim=1,lowlim=-1):
