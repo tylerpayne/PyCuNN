@@ -82,7 +82,7 @@ class lstm(object):
 		self.forget()
 
 
-	def train(self,ds,epochs,enc,batch_size=1,lr=0.01,decay=0.99):
+	def train(self,ds,epochs,enc,batch_size=1,lr=0.1,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		#self.lr = lr/batch_size
 		self.lr = lr
@@ -100,8 +100,8 @@ class lstm(object):
 				targets = []
 				for t in range(len(x)):
 					count += 1
-					self.forward(x[t][0])
-					targets.append(x[t][1])
+					self.forward(cm.CUDAMatrix(x[t][0]))
+					targets.append(cm.CUDAMatrix(x[t][1]))
 					if x[t][1].argmax(axis=1).asarray()[0][0] == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
 						correct += 1
 				#print(targets)
@@ -170,7 +170,7 @@ class lstm(object):
 			#print(seq_len)
 			for seq in range(1000):
 				#print('seq',seq)
-				x = ds[seq][0][0]
+				x = cm.CUDAMatrix(ds[seq][0][0])
 				targets = [ds[seq][0][1]]
 				count += 1
 				self.forward(x)
@@ -410,7 +410,7 @@ class lstm_layer(object):
 
 ds = []
 print('Loading Text')
-with open('../data/ptb.train.short.txt') as doc:
+with open('../data/ptb.train.txt') as doc:
 	f = doc.read()
 	words = f.split(' ')
 	sequences = f.split('\n')
@@ -424,8 +424,8 @@ for x in sequences:
 	del w[0]
 	seq = []
 	for z in range(len(w)-1):
-		i = cm.CUDAMatrix(enc.transform([w[z]]))
- 		t = cm.CUDAMatrix(enc.transform([w[z+1]]))
+		i = enc.transform([w[z]])
+ 		t = enc.transform([w[z+1]])
  		seq.append([i,t])
  	ds.append(seq)
 
@@ -434,11 +434,11 @@ for x in sequences:
 #print(ds[0][0][1])
 
 n_tokens = enc.classes_.shape[0]
-net = lstm([n_tokens,700,n_tokens])
+net = lstm([n_tokens,1000,n_tokens])
 
 start = timer()
 print('Starting Training')
-net.train(ds,100,enc)
+net.train(ds,200,enc)
 time  = timer() - start
 print('Time:',time)
 
