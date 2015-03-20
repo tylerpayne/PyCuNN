@@ -82,7 +82,7 @@ class lstm(object):
 		self.forget()
 
 
-	def train(self,ds,epochs,enc,batch_size=1,lr=0.1,decay=0.99):
+	def train(self,ds,epochs,enc,batch_size=1,lr=0.01,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		#self.lr = lr/batch_size
 		self.lr = lr
