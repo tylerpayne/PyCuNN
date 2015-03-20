@@ -85,6 +85,7 @@ class lstm(object):
 	def train(self,ds,epochs,enc,batch_size=1,lr=0.1,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		#self.lr = lr/batch_size
+		self.lr = lr
 		self.last_best_acc = 0
 		acc = 0
 		self.last_best_model = []
