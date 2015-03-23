@@ -1,6 +1,6 @@
 import numpy as np 
 import cudamat as cm 
-from numbapro import vectorize,cuda
+#from numbapro import vectorize,cuda
 import multiprocessing as mp
 from sklearn import preprocessing as pp
 from timeit import default_timer as timer

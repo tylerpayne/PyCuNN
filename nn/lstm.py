@@ -7,7 +7,7 @@ from timeit import default_timer as timer
 import math
 import pickle
 import utils
-from nltk.corpus import brown
+#from nltk.corpus import brown
 import sys
 
 cm.shutdown()
