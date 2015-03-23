@@ -1,5 +1,6 @@
 from numbapro import vectorize, cuda
 from numbapro.cudalib import cublas
+from sklearn import preprocessing
 import cudamat as cm
 import numpy as np
 import cProfile as profile
@@ -38,6 +39,68 @@ def run():
     cmtime = timer()-start
     print('cmtime',cmtime)
 
-
 run()
-#profile.run('run()')
+'''
+
+def iter():
+    start = timer()
+    with open('./data/ptb.train.short.txt') as doc:
+        f = doc.read()
+        words = f.split(' ')
+        seq = f.split('\n')
+
+   
+    enc = prepro.LabelBinarizer()
+    enc.fit(words)
+    ds = []
+    for x in sequences:
+        w = x.split(' ')
+        del w[-1]
+        del w[0]
+        seq = []
+        for z in range(len(w)-1):
+            i = cm.CUDAMatrix(enc.transform([w[z]]))
+            t = cm.CUDAMatrix(enc.transform([w[z+1]]))
+            seq.append([i,t])
+        ds.append(seq)
+    slurp = timer() - start
+    print('slurptime:' slurp)
+
+    start = timer()
+    ds=[]
+    with open('./data/ptb.train.short.txt','r+') as doc:
+        for line in doc:
+
+   
+    enc = prepro.LabelBinarizer()
+    enc.fit(words)
+    ds = []
+    for x in sequences:
+        w = x.split(' ')
+        del w[-1]
+        del w[0]
+        seq = []
+        for z in range(len(w)-1):
+            i = cm.CUDAMatrix(enc.transform([w[z]]))
+            t = cm.CUDAMatrix(enc.transform([w[z+1]]))
+            seq.append([i,t])
+        ds.append(seq)
+    slurp = timer() - start
+    print('slurptime:' slurp)
+
+
+'''
+
+
+
+
+
+
+
+
+
+
+
+
+
+
