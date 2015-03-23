@@ -91,8 +91,8 @@ class lstm(object):
 				targets = []
 				for t in range(len(x)):
 					count += 1
-					self.forward(cm.CUDAMatrix(enc.transform(x[t][0])))
-					targets.append(cm.CUDAMatrix(enc.transform(x[t][1])))
+					self.forward(cm.CUDAMatrix(enc.transform([x[t][0]])))
+					targets.append(cm.CUDAMatrix(enc.transform([x[t][1]])))
 					if x[t][1].argmax(axis=1) == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
 						correct += 1
 				#print(targets)
@@ -351,8 +351,8 @@ for z in sentences:
 	del s[0]
 	del s[-1]
 	sent = []
-	for w in s:
-		sent.append(w)
+	for w in range(len(s)-2):
+		sent.append([s[w],s[w+1]])
 	ds.append(sent)
 print('Built Dataset in ', timer() - start, "s")
 
