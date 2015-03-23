@@ -91,9 +91,11 @@ class lstm(object):
 				targets = []
 				for t in range(len(x)):
 					count += 1
-					self.forward(cm.CUDAMatrix(enc.transform([x[t][0]])))
-					targets.append(cm.CUDAMatrix(enc.transform([x[t][1]])))
-					if x[t][1].argmax(axis=1) == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
+					inval = enc.transform([x[t][0]])
+					tarval = enc.transform([x[t][1]])
+					self.forward(cm.CUDAMatrix(inval))
+					targets.append(cm.CUDAMatrix(tarval))
+					if inval.argmax(axis=1) == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
 						correct += 1
 				#print(targets)
 				acc = float(correct)/float(count)
