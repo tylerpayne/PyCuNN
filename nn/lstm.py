@@ -343,7 +343,17 @@ with open('../data/ptb.train.txt','r+') as doc:
 	words = f.split(' ')
 enc = prepro.LabelBinarizer()
 enc.fit(words)
-#ds= utils.encode_sentences(enc,sentences)
+#ds= utils.encode_sentences(enc,,sentences)
+ds = []
+del(sentences[-1])
+for z in sentences:
+	s = z.split(' ')
+	del s[0]
+	del s[-1]
+	sent = []
+	for w in s:
+		sent.append(w)
+	ds.append(sent)
 print('Built Dataset in ', timer() - start, "s")
 
 
@@ -357,7 +367,7 @@ net = lstm([n_tokens,1000,n_tokens])
 
 start = timer()
 print('Starting Training')
-net.train(sentences,200,enc)
+net.train(ds,200,enc)
 time  = timer() - start
 print('Training Time:',time)
 
