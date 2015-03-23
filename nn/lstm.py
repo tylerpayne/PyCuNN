@@ -76,7 +76,7 @@ class lstm(object):
 		self.updates_tm1 = [self.gw2,self.gb2]
 		self.forget()
 
-	def train(self,ds,epochs,enc,batch_size=1,lr=0.1,decay=0.99):
+	def train(self,ds,epochs,batch_size=1,lr=0.05,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr
 		self.last_best_acc = 0
@@ -89,13 +89,13 @@ class lstm(object):
 			for seq in range(len(ds)-1):
 				x = ds[seq]
 				targets = []
-				for t in range(len(x)):
+				for t in range(len(x)-1):
 					count += 1
-					inval = enc.transform([x[t][0]])
-					tarval = enc.transform([x[t][1]])
-					self.forward(cm.CUDAMatrix(inval))
-					targets.append(cm.CUDAMatrix(tarval))
-					if tarval.argmax(axis=1) == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
+					inval = utils.encode(x[t])
+					tarval = utils.encode(x[t+1])
+					self.forward(inval)
+					targets.append(tarval)
+					if utils.vocab[x[t+1]] == self.outputs[-1].argmax(axis=1).asarray()[0][0]:
 						correct += 1
 				#print(targets)
 				acc = float(correct)/float(count)
@@ -107,18 +107,18 @@ class lstm(object):
 					self.lr = self.lr*decay
 				self.bptt(targets)
 				if seq % batch_size == 0:
-					#print('Outputs:',enc.inverse_transform(self.outputs[-2].asarray()),enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1][0].asarray()),'Target',enc.inverse_transform(targets[-1].asarray()))
+					#rint('Outputs:',utils.decode(self.outputs[-2].asarray()),utils.decode(self.outputs[-1].asarray()),'Input',x[-2],'Target',utils.decode(targets[-1].asarray()))
 					#print('gw2',self.gw2.asarray(),'gb2',self.gb2.asarray(),'iifog',cm.sum(self.hidden_layer.gi_IFOG,axis=1).sum(axis=0).asarray(),'hifog',self.hidden_layer.hm1_IFOG.asarray())
 					self.updateWeights()
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
 				self.reset_activations()
 			time = timer() - start
-			sent = [enc.inverse_transform(ds[10][0][0].asarray())]
+			sent = [ds[10][0]]
 			for i in range(15):
-				x = cm.CUDAMatrix(enc.transform([sent[-1]]))
+				x = utils.encode(sent[-1])
 				y = self.forward(x)
-				sent.append(enc.inverse_transform(y.asarray())[0])
+				sent.append(utils.decode(y.asarray()))
 			self.forget()
 			print('Trained Epoch:',epoch+1,"With Accuracy:",acc, 'in', time, 'seconds', 'Learning Rate:',self.lr)
 			print('Generated Sentence:',sent)
@@ -332,44 +332,14 @@ class lstm_layer(object):
 		self.gi_IFOG = utils.zeros(self.layers[0],self.layers[1]*4)
 		self.ghm1_IFOG = utils.zeros(self.layers[1],self.layers[1]*4)
 
-start = timer()
-print('Loading Text')
-'''words = list(brown.words())
-sentences = list(brown.sents())
-total = len(sentences)
-'''
+ds = utils.load_data('../data/ptb.train.txt')
 
-with open('../data/ptb.train.txt','r+') as doc:
-	f = doc.read()
-	sentences = f.split('\n')
-	words = f.split(' ')
-enc = prepro.LabelBinarizer()
-enc.fit(words)
-#ds= utils.encode_sentences(enc,,sentences)
-ds = []
-del(sentences[-1])
-for z in sentences:
-	s = z.split(' ')
-	del s[0]
-	del s[-1]
-	sent = []
-	for w in range(len(s)-2):
-		sent.append([s[w],s[w+1]])
-	ds.append(sent)
-print('Built Dataset in ', timer() - start, "s")
-
-
-#ds = np.array(ds.tolist())
-#print(ds.shape)
-#print(ds[0][0][1])
-
-
-n_tokens = enc.classes_.shape[0]
-net = lstm([n_tokens,1000,n_tokens])
+n_tokens = utils.word_idx
+net = lstm([n_tokens,400,n_tokens])
 
 start = timer()
 print('Starting Training')
-net.train(ds,200,enc)
+net.train(ds,200)
 time  = timer() - start
 print('Training Time:',time)
 

@@ -5,23 +5,6 @@ import multiprocessing as mp
 from sklearn import preprocessing as pp
 from timeit import default_timer as timer
 
-
-'''
-class LabelBinarizer(object):
-	def __init__(self, pos_label = 1,neg_label = 0):
-		super(LabelBinarizer, self).__init__()
-		self.pos_label = pos_label
-		self.neg_label = neg_label
-
-	def fit(self,textArray):
-		self.vocab = np.array([],dtype='|S5')
-		dvocab = cuda.to_device(self.vocab)
-		dtext = cuda.to_device(textArray)
-
-	@cuda.jit('void(char[:],char')
-	def iterate(arr,test,ret):
-'''
-
 def init_weights(n_in,n_out,gpu=True):
 	w=None
 	if gpu is True:
@@ -46,40 +29,58 @@ def zeros(n_in,n_out,gpu=True):
 		w = np.zeros((n_in,n_out))
 	return(w)
 
-def encode_sentences(enc,sentences):
-	num_processes = 8
-	z,x = 0,len(sentences)/num_processes
-	processes = []
-	output = mp.Queue()
-	for _ in range(num_processes-1):
-		processes.append(mp.Process(target=encode,args=(enc,sentences[z:x],output)))
-		z = x
-		x = x+len(sentences)/num_processes
-	processes.append(mp.Process(target=encode,args=(enc,sentences[z:],output)))
-	for p in processes:
-		p.start()
-	print('Building Dataset')
-	results = [output.get() for p in processes]
-	for p in processes:
-		p.join()
+def load_data(fname):
+	global vocab
+	vocab = {}
+	global inv_vocab
+	inv_vocab = []
+	global word_idx
+	word_idx = 0
+	with open(fname,'r+') as doc:
+		f = doc.read()
+		sentences = f.split('\n')
+		del sentences[-1]
+		words = f.split(' ')
+
+	for i in range(len(words)-1):
+		if words[i] not in vocab:
+			vocab[words[i]] = word_idx
+			inv_vocab.append(words[i])
+			word_idx += 1
 	ds = []
-	for seq in results:
-		print(len(seq))
-		for sent in seq:
-			ds.append(sent)
-	print('Built Dataset')
+	for seq in sentences:
+		seq = seq.split(' ')
+		del seq[0]
+		del seq[-1]
+		sent = []
+		for w in seq:
+			sent.append(w)
+		ds.append(sent)
 	return ds
 
-def encode(enc,sentences,output):
-	p = mp.current_process()
-	seq = []
-	for sent in sentences:
-		s = []
-		for z in range(len(sent)-2):
-			i = enc.transform([sent[z]])
- 			t = enc.transform([sent[z+1]])
- 			s.append([i,t])
- 		seq.append(s)
- 	output.put(seq)
+def encode(word):
+	x = np.zeros((1,word_idx))
+	x[0][vocab[word]] = 1.
+	return cm.CUDAMatrix(x)
+
+def decode(arr):
+	index = arr.argmax(axis=1)
+	return inv_vocab[index]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
