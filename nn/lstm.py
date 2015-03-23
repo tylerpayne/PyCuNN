@@ -92,7 +92,7 @@ class lstm(object):
 				for t in range(len(x)):
 					count += 1
 					inval = enc.transform([x[t][0]])
-					print(inval)
+					print('inval',inval)
 					tarval = enc.transform([x[t][1]])
 					self.forward(cm.CUDAMatrix(inval))
 					targets.append(cm.CUDAMatrix(tarval))
