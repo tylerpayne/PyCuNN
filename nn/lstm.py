@@ -209,14 +209,14 @@ class lstm_layer(object):
 		ifog_activate(temp,self.gates)
 		
 		mzero(self.states)
-		mmult(i,g,states)
+		mmmult(i,g,states)
 		mzero(temp)
-		mmult(f,self.prev_states[-1],temp)
+		mmmult(f,self.prev_states[-1],temp)
 		mmadd(states,temp,states)
 
 		mzero(self.output)
 		mtanh(states,self.output)
-		mmult(self.output,o,self.output)
+		mmmult(self.output,o,self.output)
 
 		self.prev_outputs.append(self.output)
 		self.prev_states.append(states)
@@ -258,39 +258,39 @@ class lstm_layer(object):
 		#Loss wrt Cell State
 		mtanh_deriv(s,self.es)
 		
-		mmult(self.es,fo,self.es)
-		mmult(self.es,ec,self.es)
+		mmmult(self.es,fo,self.es)
+		mmmult(self.es,ec,self.es)
 		
 		mzero(self.temp)
 
-		mmult(ff_tp1,es_tp1,self.temp)
+		mmmult(ff_tp1,es_tp1,self.temp)
 		mmadd(self.es,self.temp,self.es)
 
 		#Gradient at Output Gates
 		mtanh(s,self.go)
-		mmult(self.go,self.ec,self.go)
+		mmmult(self.go,self.ec,self.go)
 		mzero(self.temp)
 		msigmoid_deriv(o,self.temp)
-		mmult(self.go,self.temp,self.go)
+		mmmult(self.go,self.temp,self.go)
 
 		#Gradient at Cell Input
 		mtanh_deriv(g,self.gg)
 		mzero(self.temp)
-		mmult(fi,es,self.temp)
-		mmult(self.gg,self.temp,self.gg)
+		mmmult(fi,es,self.temp)
+		mmmult(self.gg,self.temp,self.gg)
 
 		#Gradient at Forget Gate
-		mmult(s_tm1,self.es,self.gf)
+		mmmult(s_tm1,self.es,self.gf)
 		mzero(self.temp)
 		msigmoid_deriv(f,self.temp)
-		mmult(self.gf,self.temp,self.gf)
+		mmmult(self.gf,self.temp,self.gf)
 
 		#Gradient at Input Gate
 		mtanh(g,self.gi)
-		mmult(self.gi,es,self.gi)
+		mmmult(self.gi,es,self.gi)
 		mzero(self.temp)
 		msigmoid_deriv(i,self.temp)
-		mmult(self.gi,self.temp,self.gi)
+		mmmult(self.gi,self.temp,self.gi)
 
 		#self.clip(es)
 		self.prev_es.append(mcopy(self.es))
@@ -361,12 +361,12 @@ net.last_best()
 
 net.forget()
 
-"""
-sent = [enc.inverse_transform(ds[0][12][0].asarray())]
-for i in range(30):
-	x = cm.CUDAMatrix(enc.transform([sent[-1]]))
-	y = net.forward(x)
-	sent.append(enc.inverse_transform(y.asarray())[0])
+
+sent = [ds[10][0]]
+for i in range(15):
+	x = encode(sent[-1])
+	y = self.forward(x)
+	sent.append(decode(y))
 
 print(sent)
-"""
+
