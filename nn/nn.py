@@ -1,8 +1,8 @@
 import numpy as np 
-import cudamat as cm 
-from cudamat import learn as cl
-
-cm.cublas_init()
+import utils
+from utils import *
+from numbapro import cuda
+from timeit import default_timer as timer
 
 class nn(object):
 	def __init__(self, layers):
@@ -10,81 +10,139 @@ class nn(object):
 		self.layers = layers
 		self.output = None
 
-		self.w1 = cm.CUDAMatrix(np.random.uniform(
-			low=-np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			high=np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			size = (self.layers[0],self.layers[1])
-		))
+		self.w1 = init_weights([self.layers[0],self.layers[1]])
 
-		self.b1 = cm.CUDAMatrix(np.random.uniform(
-			low=-np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			high=np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			size = (1,self.layers[1])
-		))
+		self.b1 = init_weights([1,self.layers[1]])
 
-		self.w2 = cm.CUDAMatrix(np.random.uniform(
-			low=-np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			high=np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			size = (self.layers[1],self.layers[2])
-		))
+		self.w2 = init_weights([self.layers[1],self.layers[2]])
 
-		self.b2 = cm.CUDAMatrix(np.random.uniform(
-			low=-np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			high=np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			size = (1,self.layers[2])
-		))
+		self.b2 = init_weights([1,self.layers[2]])
 
-		self.gw1 = cm.CUDAMatrix(np.zeros([self.layers[0],self.layers[1]]))
-		self.gw2 = cm.CUDAMatrix(np.zeros([self.layers[1],self.layers[2]]))
-
-		self.gb1 = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.gb2 = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
+		self.h = zeros([1,self.layers[1]])
+		self.y = zeros([1,self.layers[2]])
+		self.output = zeros([1,self.layers[2]])
+		self.delta = zeros([1,self.layers[1]])
+		self.gw1 = zeros([self.layers[0],self.layers[1]])
+		self.gw2 = zeros([self.layers[1],self.layers[2]])
+		self.gb1 = zeros([1,self.layers[1]])
+		self.gb2 = zeros([1,self.layers[2]])
+		self.gOutput = zeros([1,self.layers[2]])
+		self.gInput = zeros([1,self.layers[0]])
+		self.input = zeros([1,self.layers[0]])
 
 	def forward(self,x):
-		self.input = x
-		self.h = cm.sigmoid(cm.dot(x,self.w1).add(self.b1))
-		logits = cm.exp(cm.dot(self.h,self.w2).add(self.b2))
-		self.output = logits.mult_by_col(cm.pow(cm.sum(logits,axis=1),-1))
+		mzero(self.input)
+		mzero(self.h)
+		mzero(self.y)
+		mzero(self.output)
+
+		self.input = mcopy(x)
+		fp(x,self.w1,self.b1,self.h)
+		msigmoid(self.h,self.h)
+		fp(self.h,self.w2,self.b2,self.y)
+		msoftmax(self.y,self.output)
+		#msigmoid(self.y,self.output)
 		return self.output
 
 	def backward(self,t):
+		mzero(self.gOutput)
+		mzero(self.gInput)
+		mzero(self.delta)
+		mzero(self.gw2)
+		mzero(self.gb2)
+		mzero(self.gw1)
+		mzero(self.gb1)
 
-		assert t.shape[0] is self.input.shape[0], "Ensure Same Batch Size as Forward Pass"
+		#hdelta = np.zeros(self.delta.shape,dtype='float32')
+		#self.delta.copy_to_host(hdelta)
+		#print(hdelta)
 
-		self.delta = cm.CUDAMatrix(np.zeros([t.shape[0],self.layers[1]]))
-		self.gw1 = cm.CUDAMatrix(np.zeros([self.layers[0],self.layers[1]]))
-		self.gw2 = cm.CUDAMatrix(np.zeros([self.layers[1],self.layers[2]]))
-		self.gb1 = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.gb2 = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
-		gOutput = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
+		#ht = np.zeros(t.shape,dtype='float32')
+		#t.copy_to_host(ht)
+		#print('t,',ht)
 
-		self.output.subtract(t,target=gOutput)
-		self.gw2.add_dot(self.h.T,gOutput)
-		self.gb2.add_sums(gOutput,axis = 0)
+		#go = np.zeros(self.gOutput.shape,dtype='float32')
 		
-		self.delta = cm.dot(gOutput,self.w2.T)
-		cl.mult_by_sigmoid_deriv(self.delta,self.h)
+		#self.gOutput.copy_to_host(go)
+		#print(go)
+		mmsubtract(self.output,t,self.gOutput)
+		bp(self.gOutput,self.w2,self.gw2,self.gb2,self.h,self.delta)
+		msigmoid_deriv(self.delta,self.h,self.delta)
+		bp(self.delta,self.w1,self.gw1,self.gb1,self.input,self.gInput)
 
-		self.gw1.add_dot(self.input.T,self.delta)
-		self.gb1.add_sums(self.delta,axis = 0)
+		#f = np.zeros(self.w1.shape,dtype='float32')
 
-		self.w2.subtract(self.gw2.mult(0.01))
-		self.b2.subtract(self.gb2.mult(0.01))
-		self.w1.subtract(self.gw1.mult(0.01))
-		self.b1.subtract(self.gb1.mult(0.01))
+		update_weights(self.w1,self.gw1,0.1)
+		update_weights(self.b1,self.gb1,0.1)
+		update_weights(self.w2,self.gw2,0.1)
+		update_weights(self.b2,self.gb2,0.1)
 
-	def train(self,ds_x,ds_t,batch_size=1,epochs):
+		#self.w1.copy_to_host(f)
+		#print(f)
 
-		assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
+	def train(self,ds,epochs,batch_size=1):
 
 		for epoch in range(epochs):
-			print('Epoch:',epoch)
-			for batch in range(len(ds)/batch_size):
-				x = ds_x[batch*batch_size:(batch+1)*batch_size]
-				t = ds_t[batch*batch_size:(batch+1)*batch_size]
-
-				self.forward(x)
+			start = timer()
+			for i in range(len(ds)):
+				x = cuda.to_device(ds[i][0])
+				t = cuda.to_device(ds[i][1])
+				assert x.shape[1] == self.layers[0]
+				assert t.shape[1] == self.layers[2]
+				#f = np.array([[0,0]],dtype='float32')
+				self.forward(x)#.copy_to_host(f)
+				#print('target',ds[i][1],'output',f)
 				self.backward(t)
+			print("Epoch",epoch,"Time Per Example",(timer()-start)/float(len(ds)))
+
+a = [np.array([[0,0]],dtype='float32'),np.array([[1,0]],dtype='float32')]
+b = [np.array([[0,1]],dtype='float32'),np.array([[0,1]],dtype='float32')]
+c = [np.array([[1,0]],dtype='float32'),np.array([[0,1]],dtype='float32')]
+d = [np.array([[1,1]],dtype='float32'),np.array([[1,0]],dtype='float32')]
+
+ds = []
+for _ in range(100):
+	ds.append(a)
+	ds.append(b)
+	ds.append(c)
+	ds.append(d)
+
+net = nn([2,400,2])
+
+net.train(ds,25)
+
+x = cuda.to_device(ds[0][0])
+
+f = np.array([[0,0]],dtype='float32')
+
+
+net.forward(x).copy_to_host(f)
+print(f)
+
+x = cuda.to_device(ds[1][0])
+
+f = np.array([[0,0]],dtype='float32')
+
+
+net.forward(x).copy_to_host(f)
+print(f)
+
+
+x = cuda.to_device(ds[2][0])
+
+f = np.array([[0,0]],dtype='float32')
+
+
+net.forward(x).copy_to_host(f)
+print(f)
+
+x = cuda.to_device(ds[3][0])
+
+f = np.array([[0,0]],dtype='float32')
+
+
+net.forward(x).copy_to_host(f)
+print(f)
 
 
 			

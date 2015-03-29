@@ -36,6 +36,8 @@ class lstm(object):
 		self.gw2 = zeros(self.w2.shape)
 		self.gb2 = zeros(self.b2.shape)
 		self.gOutput = zeros([1,self.layers[2]])
+		self.delta = zeros([1,self.layers[1]])
+		self.output = zeros([1,self.layers[2]])
 
 		self.forget()
 		self.updates_tm1 = [self.gw2,self.gb2]
@@ -97,7 +99,7 @@ class lstm(object):
 					tarval = encode(x[t+1])
 					self.forward(inval)
 					targets.append(tarval)
-					if vocab[x[t+1]] == asarray(self.outputs[-1]).argmax(axis=1):
+					if utils.vocab[x[t+1]] == asarray(self.outputs[-1]).argmax(axis=1):
 						correct += 1
 				#print(targets)
 				acc = float(correct)/float(count)
@@ -136,10 +138,9 @@ class lstm(object):
 		#print("MAIN RESET")
 		#self.dmasks = [cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.w2.shape)),cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.b2.shape))]
 		mzero(self.output)
-		self.outputs = [zeros(1,self.layers[-1])]
-		mzero(self.h)
-		self.hs = [zeros(1,self.layers[-1])]
-		self.inputs=[zeros(1,self.layers[0])]
+		self.outputs = [zeros([1,self.layers[-1]])]
+		self.hs = [zeros([1,self.layers[-1]])]
+		self.inputs=[zeros([1,self.layers[0]])]
 		self.hidden_layer.reset_activations()
 
 	def forget(self):
@@ -168,7 +169,7 @@ class lstm_layer(object):
 		self.uplim = uplim
 		self.lowlim = lowlim
 		self.updates_tm1 = [zeros([self.layers[0],self.layers[1]*4]),zeros([self.layers[1],self.layers[1]*4])]
-		temp = zeros([1,self.layers[1]])
+		self.temp = zeros([1,self.layers[1]])
 		i = zeros([self.layers[0],self.layers[1]])
 		f = zeros([self.layers[0],self.layers[1]])
 		o = zeros([self.layers[0],self.layers[1]])
@@ -190,36 +191,38 @@ class lstm_layer(object):
 		self.forget()
 
 	def forward(self,x):
-		mzero(temp)
-		i = mzero(self.gates[0])
-		f = mzero(self.gates[1])
-		o = mzero(self.gates[2])
-		g = mzero(self.gates[3])
+		mzero(self.temp)
 
-		mmprod(x,self.i_IFOG,temp)
-		mmprod(self.prev_outputs[-1],self.hm1_IFOG,temp)
-		ifog_split(temp,self.gates)
+		for gate in self.gates:
+			mzero(gate)
+
+		i = self.gates[0]
+		f = self.gates[1]
+		o = self.gates[2]
+		g = self.gates[3]
+
+		mmprod(x,self.i_IFOG,self.temp)
+		mmprod(self.prev_outputs[-1],self.hm1_IFOG,self.temp)
+		ifog_split(self.temp,self.gates)
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
-		i = mzero(self.gates[0])
-		f = mzero(self.gates[1])
-		o = mzero(self.gates[2])
-		g = mzero(self.gates[3])
+		for gate in self.gates:
+			mzero(gate)
 
-		ifog_activate(temp,self.gates)
+		ifog_activate(self.temp,self.gates)
 		
 		mzero(self.states)
-		mmmult(i,g,states)
-		mzero(temp)
-		mmmult(f,self.prev_states[-1],temp)
-		mmadd(states,temp,states)
+		mmmult(i,g,self.states)
+		mzero(self.temp)
+		mmmult(f,self.prev_states[-1],self.temp)
+		mmadd(self.states,self.temp,self.states)
 
 		mzero(self.output)
-		mtanh(states,self.output)
+		mtanh(self.states,self.output)
 		mmmult(self.output,o,self.output)
 
 		self.prev_outputs.append(self.output)
-		self.prev_states.append(states)
+		self.prev_states.append(self.states)
 		self.prev_fgates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 		self.inputs.append(x)
 		#print(self.output.asarray())
