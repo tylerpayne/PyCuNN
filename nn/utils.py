@@ -66,7 +66,7 @@ def load_sentences_data(fname,gpu=False):
 		del seq[-1]
 		sent = []
 		for w in seq:
-			if gpu = True:
+			if gpu == True:
 				w = encode(w)
 			sent.append(w)
 		ds.append(sent)
