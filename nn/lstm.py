@@ -82,7 +82,7 @@ class lstm(object):
 		self.updates_tm1 = [mcopy(self.gw2),mcopy(self.gb2)]
 		self.forget()
 
-	def train(self,ds,epochs,batch_size=1,lr=0.1,decay=0.99):
+	def train(self,ds,epochs,batch_size=1,lr=0.01,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr
 		self.last_best_acc = 0
@@ -122,7 +122,7 @@ class lstm(object):
 					self.updateWeights()
 					time += timer()-st
 					wps = float(w)/time
-					print('ETA',(float(utils.total)/wps)/60.,'min')
+					#print('ETA',(float(utils.total)/wps)/60.,'min')
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
 				self.reset_activations()
