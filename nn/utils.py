@@ -40,6 +40,7 @@ def asarray(a):
 	return x
 
 def load_sentences_data(fname,gpu=False):
+	print('Building Dataset')
 	global vocab
 	vocab = {}
 	global inv_vocab
@@ -70,6 +71,7 @@ def load_sentences_data(fname,gpu=False):
 				w = encode(w)
 			sent.append(w)
 		ds.append(sent)
+	print('Dataset is Ready')
 	return ds
 
 def encode(word):
