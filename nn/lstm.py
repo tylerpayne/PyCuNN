@@ -106,8 +106,8 @@ class lstm(object):
 					tarval = encode(x[t+1])
 					self.forward(inval)
 					targets.append(tarval)
-					if utils.vocab[x[t+1]] == asarray(self.outputs[-1]).argmax(axis=1):
-						correct += 1
+					#if utils.vocab[x[t+1]] == asarray(self.outputs[-1]).argmax(axis=1):
+						#correct += 1
 				#print(targets)
 				acc = float(correct)/float(count)
 				if acc > self.last_best_acc:
