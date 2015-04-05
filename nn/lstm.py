@@ -8,9 +8,6 @@ import utils
 from utils import *
 import sys
 
-cm.shutdown()
-cm.init()
-
 class lstm(object):
 	def __init__(self, layers,uplim=15,lowlim=-15,softmax=True):
 		super(lstm, self).__init__()
