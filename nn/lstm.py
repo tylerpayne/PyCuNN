@@ -1,5 +1,4 @@
-import cudamat as cm
-from cudamat import learn as cl
+
 import numpy as np
 import copy
 from timeit import default_timer as timer
