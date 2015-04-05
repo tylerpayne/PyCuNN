@@ -362,7 +362,7 @@ class lstm_layer(object):
 		mzero(self.gi)
 
 
-ds = load_sentences_data('../data/ptb.train.txt')
+ds = load_sentences_data('../data/ptb.train.txt',gpu=True)
 
 n_tokens = utils.word_idx
 net = lstm([n_tokens,400,n_tokens])

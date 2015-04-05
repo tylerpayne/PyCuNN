@@ -39,7 +39,7 @@ def asarray(a):
 	a.copy_to_host(x)
 	return x
 
-def load_sentences_data(fname):
+def load_sentences_data(fname,gpu=False):
 	global vocab
 	vocab = {}
 	global inv_vocab
@@ -66,14 +66,20 @@ def load_sentences_data(fname):
 		del seq[-1]
 		sent = []
 		for w in seq:
+			if gpu = True:
+				w = encode(w)
 			sent.append(w)
 		ds.append(sent)
 	return ds
 
 def encode(word):
-	x = np.zeros((1,word_idx),dtype='float32')
-	x[0][vocab[word]] = 1.
-	return cuda.to_device(x)
+	if isinstance(word,basestring):
+		x = np.zeros((1,word_idx),dtype='float32')
+		x[0][vocab[word]] = 1.
+		return cuda.to_device(x)
+	else:
+		return word
+	
 
 def decode(arr):
 	a = np.zeros((arr.shape),dtype='float32')
