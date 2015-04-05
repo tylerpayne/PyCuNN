@@ -27,18 +27,22 @@ def run():
     """
     gc.collect()
 
-    a = np.array(np.random.rand(1,200),dtype='float32')*3
-    c = np.ones((1,200),dtype='float32')
-    z = np.zeros((100,200),dtype='float32')
+    a = np.array(np.random.rand(1,5000),dtype='float32')
+    c = np.ones((1,5000),dtype='float32')
+    z = np.zeros((200,400),dtype='float32')
     #o = np.zeros((3000,200),dtype='float32')
     da = cuda.to_device(a)
-    dc = cuda.to_device(c)
-    dz = cuda.to_device(z)
+
+    print(np.sum(a,axis=1))
 
     start = timer()
-    msoftmax(da,dc)
+    g = msum(da)
     cutime = timer()-start
     print('cutime',cutime)
+
+    g.copy_to_host(c)
+    print('CU',c)
+
     '''b = cm.CUDAMatrix(a)
     d = cm.CUDAMatrix(c)
 
@@ -51,9 +55,8 @@ def run():
 
     #print('cmoutput',g.asarray())'''
 
-    dc.copy_to_host(c)
-    print(c)
-    print(np.sum(c,axis=1))
+    
+   # print(np.sum(c,axis=1))
     
 def tests():
     a = np.random.rand(300,500)

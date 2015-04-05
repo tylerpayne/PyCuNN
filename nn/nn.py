@@ -38,10 +38,9 @@ class nn(object):
 
 		self.input = mcopy(x)
 		fp(x,self.w1,self.b1,self.h)
-		msigmoid(self.h,self.h)
+		mtanh(self.h,self.h)
 		fp(self.h,self.w2,self.b2,self.y)
-		msoftmax(self.y,self.output)
-		#msigmoid(self.y,self.output)
+		mtanh(self.y,self.output)
 		return self.output
 
 	def backward(self,t):
@@ -53,40 +52,27 @@ class nn(object):
 		mzero(self.gw1)
 		mzero(self.gb1)
 
-		#hdelta = np.zeros(self.delta.shape,dtype='float32')
-		#self.delta.copy_to_host(hdelta)
-		#print(hdelta)
-
-		#ht = np.zeros(t.shape,dtype='float32')
-		#t.copy_to_host(ht)
-		#print('t,',ht)
-
-		#go = np.zeros(self.gOutput.shape,dtype='float32')
-		
-		#self.gOutput.copy_to_host(go)
-		#print(go)
 		mmsubtract(self.output,t,self.gOutput)
 		bp(self.gOutput,self.w2,self.gw2,self.gb2,self.h,self.delta)
-		msigmoid_deriv(self.delta,self.h,self.delta)
+		mtanh_deriv(self.delta,self.h,self.delta)
 		bp(self.delta,self.w1,self.gw1,self.gb1,self.input,self.gInput)
 
-		#f = np.zeros(self.w1.shape,dtype='float32')
+		update_weights(self.w1,self.gw1,0.01)
+		update_weights(self.b1,self.gb1,0.01)
+		update_weights(self.w2,self.gw2,0.01)
+		update_weights(self.b2,self.gb2,0.01)
 
-		update_weights(self.w1,self.gw1,0.1)
-		update_weights(self.b1,self.gb1,0.1)
-		update_weights(self.w2,self.gw2,0.1)
-		update_weights(self.b2,self.gb2,0.1)
-
-		#self.w1.copy_to_host(f)
-		#print(f)
+		#g = np.zeros(self.w1.shape,dtype='float32')
+		#self.w1.copy_to_host(g)
+		#print(g)
 
 	def train(self,ds,epochs,batch_size=1):
 
 		for epoch in range(epochs):
 			start = timer()
 			for i in range(len(ds)):
-				x = cuda.to_device(ds[i][0])
-				t = cuda.to_device(ds[i][1])
+				x = ds[i][0]
+				t = ds[i][1]
 				assert x.shape[1] == self.layers[0]
 				assert t.shape[1] == self.layers[2]
 				#f = np.array([[0,0]],dtype='float32')
@@ -95,10 +81,10 @@ class nn(object):
 				self.backward(t)
 			print("Epoch",epoch,"Time Per Example",(timer()-start)/float(len(ds)))
 
-a = [np.array([[0,0]],dtype='float32'),np.array([[1,0]],dtype='float32')]
-b = [np.array([[0,1]],dtype='float32'),np.array([[0,1]],dtype='float32')]
-c = [np.array([[1,0]],dtype='float32'),np.array([[0,1]],dtype='float32')]
-d = [np.array([[1,1]],dtype='float32'),np.array([[1,0]],dtype='float32')]
+a = [cuda.to_device(np.array([[-1,-1]],dtype='float32')),cuda.to_device(np.array([[1,-1]],dtype='float32'))]
+b = [cuda.to_device(np.array([[-1,1]],dtype='float32')),cuda.to_device(np.array([[-1,1]],dtype='float32'))]
+c = [cuda.to_device(np.array([[1,-1]],dtype='float32')),cuda.to_device(np.array([[-1,1]],dtype='float32'))]
+d = [cuda.to_device(np.array([[1,1]],dtype='float32')),cuda.to_device(np.array([[1,-1]],dtype='float32'))]
 
 ds = []
 for _ in range(100):

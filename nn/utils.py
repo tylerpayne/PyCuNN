@@ -1,16 +1,11 @@
-from numbapro import vectorize, cuda
+from numbapro import vectorize, cuda, float32
 from numbapro.cudalib import cublas
-import cudamat as cm
 import numpy as np
 from timeit import default_timer as timer
 import math
 import gc
 
 blas = cublas.Blas()
-cm.cublas_shutdown()
-cm.shutdown()
-cm.init()
-cm.cublas_init()
 gc.collect()
 
 def init_weights(n,gpu=True):
@@ -44,18 +39,20 @@ def asarray(a):
 	a.copy_to_host(x)
 	return x
 
-def load_data(fname):
+def load_sentences_data(fname):
 	global vocab
 	vocab = {}
 	global inv_vocab
 	inv_vocab = []
 	global word_idx
 	word_idx = 0
+	global total
 	with open(fname,'r+') as doc:
 		f = doc.read()
 		sentences = f.split('\n')
 		del sentences[-1]
 		words = f.split(' ')
+		total = len(words)
 
 	for i in range(len(words)-1):
 		if words[i] not in vocab:
@@ -74,12 +71,12 @@ def load_data(fname):
 	return ds
 
 def encode(word):
-	x = np.zeros((1,word_idx))
+	x = np.zeros((1,word_idx),dtype='float32')
 	x[0][vocab[word]] = 1.
 	return cuda.to_device(x)
 
 def decode(arr):
-	a = np.zeros((arr.shape))
+	a = np.zeros((arr.shape),dtype='float32')
 	arr.copy_to_host(a)
 	index = a.argmax(axis=1)
 	return inv_vocab[index]
@@ -90,10 +87,10 @@ def decode(arr):
 
 ##SIGMOID
 
-@cuda.jit('void(float32[:,:],float32[:,:])')
-def d_msigmoid(a,b):
+@cuda.jit('void(float32[:,:],float32[:,:],int32,int32)')
+def d_msigmoid(a,b,dimx,dimy):
     x,y = cuda.grid(2)
-    if (x<a.shape[0]) and (y<a.shape[1]):
+    if (x<dimx) and (y<dimy):
         b[x,y] = 1. / (1. + math.exp(-a[x,y]))
 
 @cuda.jit('float32(float32)',device=True)
@@ -104,14 +101,14 @@ def msigmoid(a,b):
 	assert a.shape == b.shape, "Size Mismatch: (%i,%i), (%i,%i)" %(a.shape[0],a.shape[1],b.shape[0],b.shape[1])
 	blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))
 	gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((a.shape[1] + blockDim[1]) - 1) / blockDim[1]))
-	d_msigmoid[gridDim,blockDim](a,b)
+	d_msigmoid[gridDim,blockDim](a,b,a.shape[0],a.shape[1])
 
 ##SIGMOID DERIV
 
-@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:])')
-def d_msigmoid_deriv(a,h,b):
+@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:],int32,int32)')
+def d_msigmoid_deriv(a,h,b,dimx,dimy):
     x,y = cuda.grid(2)
-    if (x<a.shape[0]) and (y<a.shape[1]):
+    if (x<dimx) and (y<dimy):
         b[x,y] = ((1. - h[x,y])*h[x,y])*a[x,y]
 
 def msigmoid_deriv(a,h,b):
@@ -119,30 +116,29 @@ def msigmoid_deriv(a,h,b):
 	blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))
 	gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((a.shape[1] + blockDim[1]) - 1) / blockDim[1]))
 
-	d_msigmoid_deriv[gridDim,blockDim](a,h,b)
-
+	d_msigmoid_deriv[gridDim,blockDim](a,h,b,a.shape[0],a.shape[1])
 
 ##TANH_DERIV
 
-@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:])')
-def d_mtanh_deriv(a,h,b):
+@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:],int32,int32)')
+def d_mtanh_deriv(a,h,b,dimx,dimy):
     x,y = cuda.grid(2)
-    if (x<a.shape[0]) and (y<a.shape[1]):
-        b[x,y] = (1. - math.pow(math.tanh(h[x,y]),2))*a[x,y]
+    if (x<dimx) and (y<dimy):
+        b[x,y] = (1. - (h[x,y]*h[x,y]))*a[x,y]
 
 def mtanh_deriv(a,h,b):
 	assert a.shape == b.shape, "Size Mismatch: (%i,%i), (%i,%i)" %(a.shape[0],a.shape[1],b.shape[0],b.shape[1])
 	blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))
 	gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((a.shape[1] + blockDim[1]) - 1) / blockDim[1]))
 
-	d_mtanh_deriv[gridDim,blockDim](a,h,b)
+	d_mtanh_deriv[gridDim,blockDim](a,h,b,a.shape[0],a.shape[1])
 
 ##TANH
 
-@cuda.jit('void(float32[:,:],float32[:,:])')
-def d_mtanh(a,b):
+@cuda.jit('void(float32[:,:],float32[:,:],int32,int32)')
+def d_mtanh(a,b,dimx,dimy):
     x,y = cuda.grid(2)
-    if (x<a.shape[0]) and (y<a.shape[1]):
+    if (x<dimx) and (y<dimy):
         b[x,y] = math.tanh(a[x,y])
 
 def mtanh(a,b):
@@ -150,25 +146,24 @@ def mtanh(a,b):
 	blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))
 	gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((a.shape[1] + blockDim[1]) - 1) / blockDim[1]))
 
-	d_mtanh[gridDim,blockDim](a,b)
+	d_mtanh[gridDim,blockDim](a,b,a.shape[0],a.shape[1])
 
 ## SOFTMAX
 
-@cuda.jit('void(float32[:,:],float32[:,:],int32)')
-def d_msoftmax(a,b,dim):
+@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:],int32)')
+def d_msoftmax(a,s,b,dim):
     y = cuda.grid(1)
     if (y<dim):
-    	s = 0.
-    	for i in range(dim):
-    		s += math.exp(a[0,i])
-        b[0,y] = math.exp(a[0,y]) / s
+        b[0,y] = math.exp(a[0,y]) / s[0,0]
 
 def msoftmax(a,b,stream=None):
 	assert a.shape == b.shape, "Size Mismatch: (%i,%i), (%i,%i)" %(a.shape[0],a.shape[1],b.shape[0],b.shape[1])
 	blockDim = (min(30,a.shape[1]))
 	gridDim = (((a.shape[1] + blockDim) - 1) / blockDim)
 
-	d_msoftmax[gridDim,blockDim,stream](a,b,a.shape[1])
+	s = mexpsum(a)
+
+	d_msoftmax[gridDim,blockDim,stream](a,s,b,a.shape[1])
 
 #IFOG ACTIVATE
 
@@ -206,8 +201,8 @@ def d_ifog_build(ifog,i,f,o,g):
         	ifog[x,y] = g[x,y]
 
 def ifog_build(ifog,gates):
-    blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))
-    gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((a.shape[1] + blockDim[1]) - 1) / blockDim[1]))
+    blockDim = (min(30,ifog.shape[0]),min(30,ifog.shape[1]))
+    gridDim = ((((ifog.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((ifog.shape[1] + blockDim[1]) - 1) / blockDim[1]))
 
     d_ifog_build[gridDim,blockDim](ifog,gates[0],gates[1],gates[2],gates[3])
 
@@ -221,58 +216,114 @@ def fp(x,W,b,r):
 #BP
 
 def bp(grad,W,gW,gb,h,gradInput):
-	mmprod(mtranspose(h),grad,gW)
+	mmprod(h,grad,gW,transa='T')
 	mmadd(gb,grad,gb)
-	mmprod(grad,mtranspose(W),gradInput)
-
+	mmprod(grad,W,gradInput,transb='T')
 
 #DOT PRODUCT
 
-@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:],int32,int32,int32)')
-def d_mmprod(a,b,c,xdim,ydim,zdim):
-    x,y,z = cuda.grid(3)
-    if (x < xdim) and (y < ydim) and (z < zdim):
-    	cuda.atomic.add(c,(x,z),(a[x,y]*b[y,z]))
+def mmprod(a,b,c,transa='N',transb='N'):
+	m = a.shape[0]
+	n = b.shape[1]
+	k = a.shape[1]
+	if transa == 'T':
+		m = a.shape[1]
+		k=a.shape[0]
+	if transb == 'T':
+		n = b.shape[0]
 
-def mmprod(a,b,c):
-	assert a.shape[1] == b.shape[0], "Matrices not aligned: (%i,%i), (%i,%i)" %(a.shape[0],a.shape[1],b.shape[0],b.shape[1])
-	assert a.shape[0] == c.shape[0], "Incompatible output matrix: Should be: (%i,%i) is:(%i,%i)" %(a.shape[0],b.shape[1],c.shape[0],c.shape[1])
-	assert b.shape[1] == c.shape[1], "Incompatible output matrix: (%i,%i), (%i,%i)" %(a.shape[0],b.shape[1],c.shape[0],c.shape[1])
-
-	blockDim = (min(10,a.shape[0]),min(10,b.shape[0]),min(10,c.shape[1]))
-	gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((b.shape[0] + blockDim[1]) - 1) / blockDim[1]), (((b.shape[1] + blockDim[2]) - 1) / blockDim[2]))
-	d_mmprod[gridDim,blockDim](a,b,c,a.shape[0],a.shape[1],c.shape[1])
-
+	blas.gemm(transa,transb,m,n,k,1.0,a,b,0.0,c)
 
 #ADD/SUBTRACT
 
-@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:])')
-def d_mmadd(a,b,c):
-    x,y = cuda.grid(2)
-    if (x < c.shape[0]) and (y <c.shape[1]):
-        c[x,y] = a[x,y] + b[x,y]
-
 def mmadd(a,b,c):
-	assert a.shape == b.shape, "Size Mismatch: (%i,%i), (%i,%i)" %(a.shape[0],a.shape[1],b.shape[0],b.shape[1])
-	assert a.shape == c.shape, "Size Mismatch: (%i,%i), (%i,%i)" %(a.shape[0],a.shape[1],c.shape[0],c.shape[1])
-	blockDim = (min(30,a.shape[0]),min(30,b.shape[1]))
-	gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((b.shape[1] + blockDim[1]) - 1) / blockDim[1]))
-
-	d_mmadd[gridDim,blockDim](a,b,c)
-
-@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:])')
-def d_mmsubtract(a,b,c):
-    x,y = cuda.grid(2)
-    if (x < c.shape[0]) and (y <c.shape[1]):
-        c[x,y] = a[x,y] - b[x,y]
+	blas.geam('N','N',a.shape[0],a.shape[1],1.0,a,1.0,b,c)
 
 def mmsubtract(a,b,c):
-	assert a.shape == b.shape, "Size Mismatch: (%i,%i), (%i,%i)" %(a.shape[0],a.shape[1],b.shape[0],b.shape[1])
-	assert a.shape == c.shape, "Size Mismatch: (%i,%i), (%i,%i)" %(a.shape[0],a.shape[1],c.shape[0],c.shape[1])
-	blockDim = (min(30,a.shape[0]),min(30,b.shape[1]))
-	gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((b.shape[1] + blockDim[1]) - 1) / blockDim[1]))
+	blas.geam('N','N',a.shape[0],a.shape[1],1.0,a,-1.0,b,c)
 
-	d_mmsubtract[gridDim,blockDim](a,b,c)
+#SUM
+
+@cuda.jit('void(float32[:,:],float32[:,:])')
+def d_msum(a,b):
+	sA = cuda.shared.array(shape=(1024),dtype=float32)
+	idx = cuda.threadIdx.x
+	gidx = cuda.grid(1)
+	total = min(cuda.blockDim.x,a.shape[1] - (cuda.blockIdx.x*cuda.blockDim.x))
+	s = total/2
+	if gidx+s < a.shape[1]:
+		sA[idx] = a[0,gidx] + a[0,gidx+s]
+		cuda.syncthreads()
+		if total%2 == 1:
+				if idx == total-1:
+					sA[0] += a[0,idx] 
+		s = s/2
+		while s > 0:
+			if idx < s:
+				sA[idx] += sA[idx + s]
+			cuda.syncthreads()
+			if s%2 == 1 and s > 1:
+				if idx == s-1:
+					sA[0] += sA[idx] 
+			cuda.syncthreads()
+			s = s/2
+		if idx == 0:
+			b[0,cuda.blockIdx.x] = sA[0]
+
+def msum(a):
+	blockDim = min(1024,a.shape[1])
+	gridDim = (((a.shape[1]) + blockDim) - 1) / blockDim
+	db = cuda.device_array_like(a)
+	d_msum[gridDim,blockDim](a,db)
+	while gridDim > 1:
+		last_gridDim = gridDim
+		blockDim = gridDim
+		gridDim = ((last_gridDim + blockDim) - 1) / blockDim
+		d_msum[gridDim,blockDim](db,db)
+	return db
+
+#EXPSUM
+
+@cuda.jit('void(float32[:,:],float32[:,:])')
+def d_mexpsum(a,b):
+	sA = cuda.shared.array(shape=(1024),dtype=float32)
+	idx = cuda.threadIdx.x
+	gidx = cuda.grid(1)
+	total = min(cuda.blockDim.x,a.shape[1] - (cuda.blockIdx.x*cuda.blockDim.x))
+	s = total/2
+	if gidx+s < a.shape[1]:
+		sA[idx] = math.exp(a[0,gidx]) + math.exp(a[0,gidx+s])
+		cuda.syncthreads()
+		if total%2 == 1:
+				if idx == total-1:
+					sA[0] += math.exp(a[0,idx])
+		s = s/2
+		while s > 0:
+			if idx < s:
+				sA[idx] += sA[idx + s]
+			cuda.syncthreads()
+			if s%2 == 1 and s > 1:
+				if idx == s-1:
+					sA[0] += sA[idx] 
+			cuda.syncthreads()
+			s = s/2
+		if idx == 0:
+			b[0,cuda.blockIdx.x] = sA[0]
+
+def mexpsum(a):
+	blockDim = min(1024,a.shape[1])
+	gridDim = (((a.shape[1]) + blockDim) - 1) / blockDim
+	db = cuda.device_array_like(a)
+	d_msum[gridDim,blockDim](a,db)
+	while gridDim > 1:
+		last_gridDim = gridDim
+		blockDim = gridDim
+		gridDim = ((last_gridDim + blockDim) - 1) / blockDim
+		d_msum[gridDim,blockDim](db,db)
+	return db
+	
+
+
 
 #MULT
 
@@ -347,7 +398,7 @@ def mcopy(a):
     blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))
     gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((a.shape[1] + blockDim[1]) - 1) / blockDim[1]))
 
-    b = cuda.device_array(a.shape,dtype='float32')
+    b = cuda.device_array_like(a)
 
     d_mcopy[gridDim,blockDim](a,b)
 
@@ -380,10 +431,10 @@ def ifog_split(a,arr):
 def d_mclip(a):
     x,y = cuda.grid(2)
     if (x < a.shape[0]) and (y <a.shape[1]):
-        if (a[x,y] > 15.):
-        	a[x,y] = 15.
-        if (a[x,y] < -15.):
-        	a[x,y] = -15.
+        if (a[x,y] > 1.):
+        	a[x,y] = 1.
+        if (a[x,y] < -1.):
+        	a[x,y] = -1.
 
 def mclip(a):
     blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))

@@ -1,190 +1,168 @@
 import numpy as np 
-import cudamat as cm 
-from cudamat import learn as cl
-import timeit
-from sklearn import preprocessing as prepro
-
-cm.cublas_init()
+from timeit import default_timer as timer
+import utils
+from utils import *
 
 class rnn(object):
 	def __init__(self, layers):
 		super(rnn, self).__init__()
 		self.layers = layers
 
-		self.w1 = cm.CUDAMatrix(np.random.uniform(
-			low=-np.sqrt(6. / (self.layers[0] + self.layers[1])),
-			high=np.sqrt(6. / (self.layers[0] + self.layers[1])),
-			size = (self.layers[0],self.layers[1])
-		))
+		self.w1 = init_weights([self.layers[0],self.layers[1]])
+		self.b1 = init_weights([1,self.layers[1]])
 
-		self.b1 = cm.CUDAMatrix(np.random.uniform(
-			low=-np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			high=np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			size = (1,self.layers[1])
-		))
+		self.w2 = init_weights([self.layers[1],self.layers[2]])
+		self.b2 = init_weights([1,self.layers[2]])
 
-		self.w2 = cm.CUDAMatrix(np.random.uniform(
-			low=-np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			high=np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			size = (self.layers[1],self.layers[2])
-		))
+		self.wr = init_weights([self.layers[1],self.layers[1]])
+		self.br = init_weights([1,self.layers[1]])
 
-		self.b2 = cm.CUDAMatrix(np.random.uniform(
-			low=-np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			high=np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			size = (1,self.layers[2])
-		))
+		self.gw1 = zeros([self.layers[0],self.layers[1]])
+		self.gw2 = zeros([self.layers[1],self.layers[2]])
+		self.gwr = zeros([self.layers[1],self.layers[1]])
+		self.gb1 = zeros([1,self.layers[1]])
+		self.gb2 = zeros([1,self.layers[2]])
+		self.gbr = zeros([1,self.layers[1]])
+		self.gOutput = zeros([1,self.layers[2]])
+		self.gInput = zeros([1,self.layers[2]])
+		self.gRecurrent = zeros([1,self.layers[1]])
+		self.delta = zeros([1,self.layers[1]])
+		self.updates_tm1 = [self.gw2,self.gb2,self.gw1,self.gb1,self.gwr,self.gbr]
 
-		self.wr = cm.CUDAMatrix(np.random.uniform(
-			low=-np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			high=np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			size = (self.layers[1],self.layers[1])
-		))
-
-		self.br = cm.CUDAMatrix(np.random.uniform(
-			low=-np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			high=np.sqrt(6. / (self.layers[1] + self.layers[2])),
-			size = (1,self.layers[1])
-		))
-
-		self.inputs = []
-		self.updates_tm1 = []
+		self.output = zeros([1,self.layers[2]])
+		self.outputs = []
+		self.h = zeros([1,self.layers[1]])
+		self.r = zeros([1,self.layers[1]])
+		self.hs = [zeros([1,self.layers[1]])]
+		self.inputs=[]
 		self.lr = 0.01
-		self.forget()
 
 	def forward(self,x):
-		self.h = cm.sigmoid(cm.dot(x,self.w1).add(self.b1).add_dot(self.hs[-1],self.wr).add(self.br))
-		logits = cm.exp(cm.dot(self.h,self.w2).add(self.b2))
-		self.output = logits.mult_by_col(cm.pow(cm.sum(logits,axis=1),-1))
-		self.inputs.append(x)
-		self.hs.append(self.h)
-		self.outputs.append(self.output)
+		fp(x,self.w1,self.b1,self.h)
+		fp(self.hs[-1],self.wr,self.br,self.r)
+		mmadd(self.h,self.r,self.h)
+		mtanh(self.h,self.h)
+		fp(self.h,self.w2,self.b2,self.output)
+		msoftmax(self.output,self.output)
+		self.inputs.append(mcopy(x))
+		self.hs.append(mcopy(self.h))
+		self.outputs.append(mcopy(self.output))
 		return self.output
 
 	def bptt(self,t):
-		self.outputs[-1].subtract(t[-1],target=self.gOutput)
-		self.gw2.add_dot(self.hs[-1].T,self.gOutput)
-		self.gb2.add_sums(self.gOutput,axis = 0)
-		
-		self.delta = cm.dot(self.gOutput,self.w2.T)
-		cl.mult_by_sigmoid_deriv(self.delta,self.hs[-1])
+		for q in range(len(t)-2):
+			mmsubtract(self.outputs[-1],t[-1],self.gOutput)
+			bp(self.gOutput,self.w2,self.gw2,self.gb2,self.hs[-1],self.delta)
+			
+			mclip(self.delta)
+			mtanh_deriv(self.delta,self.hs[-1],self.delta)
+			mclip(self.delta)
 
-		self.gw1.add_dot(self.inputs[-1].T,self.delta)
-		self.gb1.add_sums(self.delta,axis = 0)
-
-		self.gwr.add_dot(self.hs[-2].T,self.delta)
-		self.gbr.add_sums(self.delta,axis=0)
-
-		for q in range(15):
-			self.delta = cm.dot(self.delta,self.wr.T)
-			self.outputs[-2].subtract(t[-2],target=self.gOutput)
-
-			self.gw2.add_dot(self.hs[-2].T,self.gOutput)
-			self.gb2.add_sums(self.gOutput,axis=0)
-
-			self.delta.add_dot(self.gOutput,self.w2.T)
-			cl.mult_by_sigmoid_deriv(self.delta,self.hs[-2])
-
-			self.gwr.add_dot(self.hs[-3].T,self.delta)
-			self.gbr.add_sums(self.delta,axis=0)		
-
-			self.gw1.add_dot(self.inputs[-2].T,self.delta)
-			self.gb1.add_sums(self.delta,axis = 0)
+			bp(self.delta,self.w1,self.gw1,self.gb1,self.inputs[-1],self.gInput)
+			#print(np.argmax(asarray(self.inputs[-1])))
+			bp(self.delta,self.wr,self.gwr,self.gbr,self.hs[-2],self.gRecurrent)
+			mclip(self.gbr)
+			mclip(self.gwr)
+			mclip(self.gw1)
+			mclip(self.gb1)
+			mclip(self.gw2)
+			mclip(self.gb2)
 
 			self.hs.pop()
 			self.inputs.pop()
 			self.outputs.pop()
-			t = np.delete(t,t.shape[0]-1)
+			t.pop()
 
 		#print(self.gwr.asarray())
 
 	def updateWeights(self):
-		temp = [self.gw2,self.gb2,self.gw1,self.gb1,self.gwr,self.gbr]
-		self.w2.subtract(self.gw2.mult(self.lr).add(self.updates_tm1[0].mult(0.9)))
-		self.b2.subtract(self.gb2.mult(self.lr).add(self.updates_tm1[1].mult(0.9)))
-		self.w1.subtract(self.gw1.mult(self.lr).add(self.updates_tm1[2].mult(0.9)))
-		self.b1.subtract(self.gb1.mult(self.lr).add(self.updates_tm1[3].mult(0.9)))
-		self.wr.subtract(self.gwr.mult(self.lr).add(self.updates_tm1[4].mult(0.9)))
-		self.br.subtract(self.gbr.mult(self.lr).add(self.updates_tm1[5].mult(0.9)))
-		self.updates_tm1 = temp
-		temp = None
+		#print(asarray(self.gwr))
+		update_weights(self.w2,self.gw2,self.lr)
+		update_weights(self.b2,self.gb2,self.lr)
+		update_weights(self.w1,self.gw1,self.lr)
+		update_weights(self.b1,self.gb1,self.lr)
+		update_weights(self.wr,self.gwr,self.lr)
+		update_weights(self.br,self.gbr,self.lr)
+		#print(asarray(self.w1))
 		self.forget()
 
-	def train(self,ds,epochs,enc,seq_len=10,batch_size=1,lr=0.02,decay=0.99):
+	def train(self,ds,epochs,batch_size=1,lr=0.01,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
-		ds_x = ds[:,:,0][0]
-		ds_t = ds[:,:,1][0]
-		self.lr = lr/batch_size
-		err = []
+		self.lr = lr
+		acc = 0
+		w = 0
+		time = 0.
+		wps = 0.
 		for epoch in range(epochs):
-			print('Epoch:',epoch+1)
-			seq_len = int(np.random.uniform(low=20,high=30,size=(1))[0])
-			#print(seq_len)
-			for seq in range(ds.shape[1]/seq_len):
-				x = ds_x[seq*seq_len:(seq+1)*seq_len]
-				d = ds_t[seq*seq_len:(seq+1)*seq_len]
-				for t in range(x.shape[0]):
-					self.forward(x[t])
-				self.bptt(d)
+			start = timer()
+			correct = 0
+			count = 0
+			for seq in range(len(ds)-1):
+				x = ds[seq]
+				targets = []
+				st = timer()
+				for t in range(len(x)-1):
+					count += 1
+					w += 1
+					inval = encode(x[t])
+					tarval = encode(x[t+1])
+					self.forward(inval)
+					targets.append(tarval)
+					if utils.vocab[x[t+1]] == asarray(self.outputs[-1]).argmax(axis=1):
+						correct += 1
+				#print(targets)
+				acc = float(correct)/float(count)
+				self.bptt(targets)
+				
 				if seq % batch_size == 0:
-					print('Output:',enc.inverse_transform(self.outputs[-1].asarray()),'Input',enc.inverse_transform(x[-1].asarray()),'Target',enc.inverse_transform(d[-1].asarray()))
+					#print(self.outputs[-1])
+					print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
+					#print('gw2',self.gw2.asarray(),'gb2',self.gb2.asarray(),'iifog',cm.sum(self.hidden_layer.gi_IFOG,axis=1).sum(axis=0).asarray(),'hifog',self.hidden_layer.hm1_IFOG.asarray())
 					self.updateWeights()
+					time += timer()-st
+					wps = float(w)/time
+					#print('wps:',wps,"eta:",(float(utils.total)/wps)/60,'min')
+				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
 				self.reset_activations()
+			time = timer() - start
+			sent = [ds[10][0]]
+			for i in range(15):
+				x = encode(sent[-1])
+				y = self.forward(x)
+				sent.append(decode(y))
+			self.forget()
+			print('Trained Epoch:',epoch+1,"With Accuracy:",acc, 'in', time, 'seconds', 'Learning Rate:',self.lr, 'wps',wps)
+			print('Generated Sentence:',sent)
 
 	def reset_grads(self):
-		self.gw1 = cm.CUDAMatrix(np.zeros([self.layers[0],self.layers[1]]))
-		self.gw2 = cm.CUDAMatrix(np.zeros([self.layers[1],self.layers[2]]))
-		self.gwr = cm.CUDAMatrix(np.zeros([self.layers[1],self.layers[1]]))
-		self.gb1 = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.gb2 = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
-		self.gbr = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.gOutput = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
-		self.delta = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
+		mzero(self.gw1)
+		mzero(self.gw2)
+		mzero(self.gwr)
+		mzero(self.gb1)
+		mzero(self.gb2)
+		mzero(self.gbr)
+		mzero(self.gOutput)
+		mzero(self.gInput)
+		mzero(self.gRecurrent)
+		mzero(self.delta)
 		self.updates_tm1 = [self.gw2,self.gb2,self.gw1,self.gb1,self.gwr,self.gbr]
+		
 
 	def reset_activations(self):
-		self.output = cm.CUDAMatrix(np.zeros([1,self.layers[2]]))
+		mzero(self.output)
 		self.outputs = []
-		self.h = cm.CUDAMatrix(np.zeros([1,self.layers[1]]))
-		self.hs = [cm.CUDAMatrix(np.zeros([1,self.layers[1]]))]
+		mzero(self.h)
+		mzero(self.r)
+		self.hs = [zeros([1,self.layers[1]])]
 		self.inputs=[]
 
 	def forget(self):
 		self.reset_grads()
 		self.reset_activations()
 
-ds = []
-print('Loading Text')
-with open('./siddhartha.txt') as doc:
-	text = doc.read().split(" ")
-print('Building Dataset')
-enc = prepro.LabelBinarizer()
-enc.fit(text)
-for x in range(len(text)-1):
-	i = cm.CUDAMatrix(enc.transform([text[x]]))
- 	t = cm.CUDAMatrix(enc.transform([text[x+1]]))
- 	ds.append([i,t])
+ds = load_sentences_data('../data/ptb.train.short.txt')
 
-ds = np.array([ds])
+net = rnn([utils.word_idx,1000,utils.word_idx])
 
-n_tokens = enc.classes_.shape[0]
-net = rnn([n_tokens,1000,n_tokens])
-
-start = timeit.timeit()
-print('Starting Training')
-net.train(ds,10,enc)
-print('Time:',start)
-
-net.forget()
-seq = [ds[0][0][0]]
-
-for i in range(30):
-	seq.append(net.forward(seq[-1]))
-
-sent = []
-for x in seq:
-	sent.append(enc.inverse_transform(x.asarray()))
-
-print(sent)
-
+net.train(ds,10)
