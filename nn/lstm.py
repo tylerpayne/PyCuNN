@@ -175,6 +175,8 @@ class lstm_layer(object):
 
 		self.hm1_IFOG = init_weights([self.layers[1],self.layers[1]*4])
 
+		self.b = init_weights([1,self.layers[1]*4])
+
 		self.uplim = uplim
 		self.lowlim = lowlim
 		self.updates_tm1 = [zeros([self.layers[0],self.layers[1]*4]),zeros([self.layers[1],self.layers[1]*4])]
@@ -185,6 +187,7 @@ class lstm_layer(object):
 		g = zeros([1,self.layers[1]])
 		self.sum_IFOG = zeros([1,self.layers[1]*4])
 		self.gates=[i,f,o,g]
+		self.biases=[mcopy(i),mcopy(f),mcopy(o),mcopy(g)]
 		self.states = zeros([1,self.layers[1]])
 		self.output = zeros([1,self.layers[1]])
 		self.recurrentGrad = zeros([1,self.layers[1]*4])
@@ -197,6 +200,7 @@ class lstm_layer(object):
 		self.ggates = zeros([1,self.layers[1]*4])
 		self.gi_IFOG = zeros([self.layers[0],self.layers[1]*4])
 		self.ghm1_IFOG = zeros([self.layers[1],self.layers[1]*4])
+		self.gb = zeros([1,self.layers[1]*4])
 
 		self.forget()
 
@@ -214,12 +218,16 @@ class lstm_layer(object):
 		f = self.gates[1]
 		o = self.gates[2]
 		g = self.gates[3]
+		print('i',asarray(i))
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
-		for gate in self.gates:
+		for gate,bias in zip(self.gates,self.biases):
 			mzero(gate)
+			mzero(bias)
 
-		ifog_activate(self.sum_IFOG,self.gates)
+		self.ifog_split(self.b,self.biases)
+
+		ifog_activate(self.sum_IFOG,self.biases,self.gates)
 		
 		mzero(self.states)
 		mmmult(i,g,self.states)
@@ -332,6 +340,9 @@ class lstm_layer(object):
 		mmprod(self.inputs[t],self.ggates,self.gi_IFOG,transa='T')
 		mmprod(self.prev_outputs[t-1],self.ggates,self.ghm1_IFOG,transa='T')
 
+		ifog_build(self.gb,self.biases)
+		mmadd(self.biases,self.ggates,self.gb)
+
 		#mclip(self.gi_IFOG)
 		#mclip(self.ghm1_IFOG)
 
@@ -340,9 +351,12 @@ class lstm_layer(object):
 	def updateWeights(self,lr):
 		#self.clip(self.ghm1_IFOG)
 		mclip(self.gi_IFOG)
+		mclip(self.gb)
 		mclip(self.ghm1_IFOG)
 
-
+		msmult(self.gb,lr,self.gb)
+		ifog_build(self.b,self.biases)
+		mmsubtract(self.b,self.gb,self.b)
 
 		msmult(self.gi_IFOG,lr,self.gi_IFOG)
 		msmult(self.updates_tm1[0],0.9,self.updates_tm1[0])

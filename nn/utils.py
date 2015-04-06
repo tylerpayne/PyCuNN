@@ -175,24 +175,24 @@ def msoftmax(a,b,stream=None):
 
 #IFOG ACTIVATE
 
-@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:],float32[:,:],float32[:,:])')
-def d_ifog_activate(ifog,i,f,o,g):
+@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:],float32[:,:],float32[:,:],float32[:,:],float32[:,:],float32[:,:],float32[:,:])')
+def d_ifog_activate(ifog,ib,fb,ob,gb,i,f,o,g):
     x,y = cuda.grid(2)
     if (x<ifog.shape[0]):
     	if (y<i.shape[1]):
-        	i[x,y] = d_sigmoid(ifog[x,y])
+        	i[x,y] = d_sigmoid(ifog[x,y]) + ib
         elif(y<g.shape[1]*2):
-        	f[x,y] = d_sigmoid(ifog[x,y])
+        	f[x,y] = d_sigmoid(ifog[x,y]) + fb
         elif(y<f.shape[1]*3):
-        	o[x,y] = d_sigmoid(ifog[x,y])
+        	o[x,y] = d_sigmoid(ifog[x,y]) + ob
         elif(y<(ifog.shape[1])):
-        	g[x,y] = math.tanh(ifog[x,y])
+        	g[x,y] = math.tanh(ifog[x,y]) + gb
 
-def ifog_activate(ifog,gates):
+def ifog_activate(ifog,biases,gates):
     blockDim = (min(30,ifog.shape[0]),min(30,ifog.shape[1]))
     gridDim = ((((ifog.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((ifog.shape[1] + blockDim[1]) - 1) / blockDim[1]))
 
-    d_ifog_activate[gridDim,blockDim](ifog,gates[0],gates[1],gates[2],gates[3])
+    d_ifog_activate[gridDim,blockDim](ifog,biases[0],biases[1],biases[2],biases[3],gates[0],gates[1],gates[2],gates[3])
 
 #IFOG BUILD
 @cuda.jit('void(float32[:,:],float32[:,:],float32[:,:],float32[:,:],float32[:,:])')
