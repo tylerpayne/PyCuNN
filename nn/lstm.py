@@ -292,7 +292,7 @@ class lstm_layer(object):
 		msigmoid_deriv(self.ec,o,self.temp)
 		print('go',np.sum(asarray(self.go)))
 		print('temp',np.sum(asarray(self.temp)))
-		mmmult(self.go,self.temp,self.go)
+		mmmult(self.temp,self.go,self.go)
 		print('aftergo',np.sum(asarray(self.go)))
 
 
