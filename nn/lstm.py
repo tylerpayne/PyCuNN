@@ -340,8 +340,7 @@ class lstm_layer(object):
 		mmprod(self.inputs[t],self.ggates,self.gi_IFOG,transa='T')
 		mmprod(self.prev_outputs[t-1],self.ggates,self.ghm1_IFOG,transa='T')
 
-		ifog_build(self.gb,self.biases)
-		mmadd(self.biases,self.ggates,self.gb)
+		mmadd(self.gb,self.ggates,self.gb)
 
 		#mclip(self.gi_IFOG)
 		#mclip(self.ghm1_IFOG)
