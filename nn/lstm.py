@@ -82,7 +82,7 @@ class lstm(object):
 		self.updates_tm1 = [mcopy(self.gw2),mcopy(self.gb2)]
 		self.forget()
 
-	def train(self,ds,epochs,batch_size=1,lr=0.01,decay=0.99):
+	def train(self,ds,epochs,batch_size=1,lr=0.08,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr
 		self.last_best_acc = 0
@@ -115,7 +115,7 @@ class lstm(object):
 					self.last_best_model = [asarray(self.w2),asarray(self.b2)]
 					self.last_best_model.append(asarray(self.hidden_layer.i_IFOG))
 					self.last_best_model.append(asarray(self.hidden_layer.hm1_IFOG))
-					#self.lr = self.lr*decay
+					self.lr = self.lr*decay
 				self.bptt(targets)
 				if seq % batch_size == 0:
 					print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
@@ -358,7 +358,7 @@ class lstm_layer(object):
 		mzero(self.gi)
 
 
-ds = load_sentences_data('../data/ptb.train.short.txt')
+ds = load_sentences_data('../data/ptb.train.short.txt',gpu=True)
 
 n_tokens = utils.word_idx
 net = lstm([n_tokens,800,n_tokens])
