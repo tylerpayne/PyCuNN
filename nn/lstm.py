@@ -119,7 +119,8 @@ class lstm(object):
 					#print('ETA',(float(utils.total)/wps)/60.,'min')
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
-				self.reset_activations()
+				if seq % 10 == 0
+					self.reset_activations()
 			acc = float(correct)/float(count)
 			if acc > self.last_best_acc:
 				self.last_best_acc = acc
