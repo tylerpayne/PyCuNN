@@ -353,7 +353,6 @@ class lstm_layer(object):
 		mmadd(self.ghm1_IFOG,self.updates_tm1[1],self.ghm1_IFOG)
 		mmsubtract(self.hm1_IFOG,self.ghm1_IFOG,self.hm1_IFOG)
 
-		print(np.sum(asarray(self.hm1_IFOG)))
 		
 		self.updates_tm1 = [mcopy(self.gi_IFOG),mcopy(self.ghm1_IFOG)]
 		#print(self.i_IFOG.asarray())
