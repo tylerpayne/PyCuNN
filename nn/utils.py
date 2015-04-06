@@ -242,7 +242,9 @@ def fp(x,W,b,r):
 #BP
 
 def bp(grad,W,gW,gb,h,gradInput=None):
-	mmprod(h,grad,gW,transa='T')
+	z = cuda.device_array_like(gW)
+	mmprod(h,grad,z,transa='T')
+	mmadd(gW,z,gW)
 	mmadd(gb,grad,gb)
 	if gradInput is not None:
 		mmprod(grad,W,gradInput,transb='T')
