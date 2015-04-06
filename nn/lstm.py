@@ -216,6 +216,7 @@ class lstm_layer(object):
 		mmprod(self.prev_outputs[-1],self.hm1_IFOG,self.temp)
 		mmadd(self.temp,self.hm1_b,self.temp)
 		mmadd(self.sum_IFOG,self.temp,self.sum_IFOG)
+		print(asarray(self.sum_IFOG))
 		ifog_split(self.sum_IFOG,self.gates)
 		i = self.gates[0]
 		f = self.gates[1]
