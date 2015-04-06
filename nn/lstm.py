@@ -217,7 +217,7 @@ class lstm_layer(object):
 		mmadd(self.temp,self.hm1_b,self.temp)
 		mmadd(self.sum_IFOG,self.temp,self.sum_IFOG)
 		ifog_split(self.sum_IFOG,self.gates)
-		print(asarray(self.gates[1]))
+		print('copying')
 		i = self.gates[0]
 		f = self.gates[1]
 		o = self.gates[2]
