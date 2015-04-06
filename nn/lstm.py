@@ -200,7 +200,8 @@ class lstm_layer(object):
 		self.ggates = zeros([1,self.layers[1]*4])
 		self.gi_IFOG = zeros([self.layers[0],self.layers[1]*4])
 		self.ghm1_IFOG = zeros([self.layers[1],self.layers[1]*4])
-		self.gb = zeros([1,self.layers[1]*4])
+		self.gi_b = zeros([1,self.layers[1]*4])
+		self.ghm1_b = zeros([1,self.layers[1]*4])
 
 		self.forget()
 
@@ -338,7 +339,8 @@ class lstm_layer(object):
 		mmprod(self.inputs[t],self.ggates,self.gi_IFOG,transa='T')
 		mmprod(self.prev_outputs[t-1],self.ggates,self.ghm1_IFOG,transa='T')
 
-		mmadd(self.gb,self.ggates,self.gb)
+		mmadd(self.gi_b,self.ggates,self.gi_b)
+		mmadd(self.ghm1_b,self.ggates,self.ghm1_b)
 
 		#mclip(self.gi_IFOG)
 		#mclip(self.ghm1_IFOG)
@@ -348,11 +350,15 @@ class lstm_layer(object):
 	def updateWeights(self,lr):
 		#self.clip(self.ghm1_IFOG)
 		mclip(self.gi_IFOG)
-		mclip(self.gb)
+		mclip(self.gi_b)
+		mclip(self.ghm1_b)
 		mclip(self.ghm1_IFOG)
 
 		msmult(self.gb,lr,self.gb)
-		mmsubtract(self.b,self.gb,self.b)
+		mmsubtract(self.i_b,self.gi_b,self.i_b)
+
+		msmult(self.ghm1_b,lr,self.ghm1_b)
+		mmsubtract(self.hm1_b,self.ghm1_b,self.hm1_b)
 
 		msmult(self.gi_IFOG,lr,self.gi_IFOG)
 		msmult(self.updates_tm1[0],0.9,self.updates_tm1[0])
