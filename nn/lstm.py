@@ -290,8 +290,8 @@ class lstm_layer(object):
 		#Gradient at Output Gates
 		mtanh(s,self.go)
 		msigmoid_deriv(self.ec,o,self.temp)
-		print('go',np.sum(asarray(self.go)))
-		print('temp',np.sum(asarray(self.temp)))
+		print('go',asarray(self.go)[0])
+		print('temp',asarray(self.temp)[0])
 		mmmult(self.temp,self.go,self.go)
 		print('aftergo',np.sum(asarray(self.go)))
 
