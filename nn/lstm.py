@@ -228,7 +228,7 @@ class lstm_layer(object):
 
 		ifog_activate(self.sum_IFOG,self.gates)
 
-		print(asarray(self.gates[2]))
+		print(asarray(self.gates[3]))
 		
 		mzero(self.states)
 		mmmult(i,g,self.states)
