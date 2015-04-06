@@ -327,6 +327,8 @@ class lstm_layer(object):
 		mclip(self.gi_IFOG)
 		mclip(self.ghm1_IFOG)
 
+		print(np.sum(asarray(self.ghm1_IFOG)))
+
 		msmult(self.gi_IFOG,lr,self.gi_IFOG)
 		msmult(self.updates_tm1[0],0.9,self.updates_tm1[0])
 		mmadd(self.gi_IFOG,self.updates_tm1[0],self.gi_IFOG)
@@ -337,7 +339,7 @@ class lstm_layer(object):
 		mmadd(self.ghm1_IFOG,self.updates_tm1[1],self.ghm1_IFOG)
 		mmsubtract(self.hm1_IFOG,self.ghm1_IFOG,self.hm1_IFOG)
 
-		print(np.sum(asarray(self.hm1_IFOG)))
+
 		
 		self.updates_tm1 = [mcopy(self.gi_IFOG),mcopy(self.ghm1_IFOG)]
 		#print(self.i_IFOG.asarray())
