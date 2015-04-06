@@ -225,7 +225,7 @@ class lstm_layer(object):
 			mzero(gate)
 			mzero(bias)
 
-		self.ifog_split(self.b,self.biases)
+		ifog_split(self.b,self.biases)
 
 		ifog_activate(self.sum_IFOG,self.biases,self.gates)
 		
