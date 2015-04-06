@@ -175,7 +175,8 @@ class lstm_layer(object):
 
 		self.hm1_IFOG = init_weights([self.layers[1],self.layers[1]*4])
 
-		self.b = init_weights([1,self.layers[1]*4])
+		self.i_b = init_weights([1,self.layers[1]*4])
+		self.hm1_b = init_weights([1,self.layers[1]*4])
 
 		self.uplim = uplim
 		self.lowlim = lowlim
@@ -187,7 +188,6 @@ class lstm_layer(object):
 		g = zeros([1,self.layers[1]])
 		self.sum_IFOG = zeros([1,self.layers[1]*4])
 		self.gates=[i,f,o,g]
-		self.biases=[mcopy(i),mcopy(f),mcopy(o),mcopy(g)]
 		self.states = zeros([1,self.layers[1]])
 		self.output = zeros([1,self.layers[1]])
 		self.recurrentGrad = zeros([1,self.layers[1]*4])
@@ -211,7 +211,9 @@ class lstm_layer(object):
 			mzero(gate)
 
 		mmprod(x,self.i_IFOG,self.sum_IFOG)
+		mmadd(self.sum_IFOG,self.i_b,self.sum_IFOG)
 		mmprod(self.prev_outputs[-1],self.hm1_IFOG,self.temp)
+		mmadd(self.temp,self.hm1_b,self.temp)
 		mmadd(self.sum_IFOG,self.temp,self.sum_IFOG)
 		ifog_split(self.sum_IFOG,self.gates)
 		i = self.gates[0]
@@ -220,13 +222,10 @@ class lstm_layer(object):
 		g = self.gates[3]
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
-		for gate,bias in zip(self.gates,self.biases):
+		for gate,bias in self.gates:
 			mzero(gate)
-			mzero(bias)
 
-		ifog_split(self.b,self.biases)
-		print(asarray(self.biases[2]))
-		ifog_activate(self.sum_IFOG,self.biases,self.gates)
+		ifog_activate(self.sum_IFOG,self.gates)
 		
 		mzero(self.states)
 		mmmult(i,g,self.states)
@@ -353,7 +352,6 @@ class lstm_layer(object):
 		mclip(self.ghm1_IFOG)
 
 		msmult(self.gb,lr,self.gb)
-		ifog_build(self.b,self.biases)
 		mmsubtract(self.b,self.gb,self.b)
 
 		msmult(self.gi_IFOG,lr,self.gi_IFOG)
