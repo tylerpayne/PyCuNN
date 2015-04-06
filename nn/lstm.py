@@ -218,7 +218,6 @@ class lstm_layer(object):
 		f = self.gates[1]
 		o = self.gates[2]
 		g = self.gates[3]
-		print(asarray(o))
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
 		for gate,bias in zip(self.gates,self.biases):
@@ -226,7 +225,7 @@ class lstm_layer(object):
 			mzero(bias)
 
 		ifog_split(self.b,self.biases)
-
+		print(asarray(self.biases[2]))
 		ifog_activate(self.sum_IFOG,self.biases,self.gates)
 		
 		mzero(self.states)
