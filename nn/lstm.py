@@ -298,10 +298,10 @@ class lstm_layer(object):
 		#Gradient at Output Gates
 		mtanh(s,self.temp)
 		msigmoid_deriv(self.ec,o,self.go)
-		print('go',asarray(self.go)[0])
-		print('temp',asarray(self.temp)[0])
+		#print('go',asarray(self.go)[0])
+		#print('temp',asarray(self.temp)[0])
 		mmmult(self.temp,self.go,self.go)
-		print('aftergo',np.sum(asarray(self.go)))
+		#print('aftergo',np.sum(asarray(self.go)))
 
 
 
@@ -309,7 +309,7 @@ class lstm_layer(object):
 		#Gradient at Cell Input
 		mtanh_deriv(self.es,g,self.gg)
 		mmmult(self.gg,fi,self.gg)
-		print('gg',asarray(self.gg))
+		#print('gg',asarray(self.gg))
 
 		#Gradient at Forget Gate
 		msigmoid_deriv(self.es,f,self.gf)
@@ -399,6 +399,7 @@ class lstm_layer(object):
 		mzero(self.gg)
 		mzero(self.gf)
 		mzero(self.gi)
+		mzero(self.gb)
 
 
 ds = load_sentences_data('../data/ptb.train.short.txt',gpu=True)
