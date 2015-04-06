@@ -322,7 +322,7 @@ def mexpsum(a):
 	blockDim = min(1024,a.shape[1])
 	gridDim = (((a.shape[1]) + blockDim) - 1) / blockDim
 	db = cuda.device_array_like(a)
-	d_msum[gridDim,blockDim](a,db)
+	d_mexpsum[gridDim,blockDim](a,db)
 	while gridDim > 1:
 		last_gridDim = gridDim
 		blockDim = gridDim
