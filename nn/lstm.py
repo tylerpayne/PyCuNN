@@ -312,6 +312,8 @@ class lstm_layer(object):
 		#self.gradInput = cm.dot(ggates,self.i_IFOG.T)
 		#self.clip(self.gradInput)
 
+		print(np.sum(asarray(self.ghm1_IFOG)))
+
 		#Accumulate Gradients
 
 		mmprod(self.inputs[t],self.ggates,self.gi_IFOG,transa='T')
@@ -327,7 +329,7 @@ class lstm_layer(object):
 		mclip(self.gi_IFOG)
 		mclip(self.ghm1_IFOG)
 
-		print(np.sum(asarray(self.ghm1_IFOG)))
+
 
 		msmult(self.gi_IFOG,lr,self.gi_IFOG)
 		msmult(self.updates_tm1[0],0.9,self.updates_tm1[0])
