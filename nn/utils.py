@@ -216,6 +216,28 @@ def ifog_build(ifog,gates):
 
     d_ifog_build[gridDim,blockDim](ifog,gates[0],gates[1],gates[2],gates[3])
 
+#IFOG SPLIT
+
+@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:],float32[:,:],float32[:,:])')
+def d_ifog_split(ifog,i,f,o,g):
+    x,y = cuda.grid(2)
+    if (x<ifog.shape[0]):
+    	if (y<i.shape[1]):
+        	i[x,y] = ifog[x,y]
+        elif(y<f.shape[1]*2):
+        	f[x,y] = ifog[x,y]
+        elif(y<o.shape[1]*3):
+        	o[x,y] = ifog[x,y]
+        elif(y<(ifog.shape[1])):
+        	g[x,y] = ifog[x,y]
+
+def ifog_split(a,arr):
+    blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))
+    gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((a.shape[1] + blockDim[1]) - 1) / blockDim[1]))
+
+    d_ifog_split[gridDim,blockDim](a,arr[0],arr[1],arr[2],arr[3])
+
+
 
 #FP
 
@@ -413,27 +435,6 @@ def mcopy(a):
     d_mcopy[gridDim,blockDim](a,b)
 
     return b
-
-#IFOG SPLIT
-
-@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:],float32[:,:],float32[:,:])')
-def d_ifog_split(ifog,i,f,o,g):
-    x,y = cuda.grid(2)
-    if (x<ifog.shape[0]):
-    	if (y<i.shape[1]):
-        	i[x,y] = ifog[x,y]
-        elif(y<g.shape[1]*2):
-        	f[x,y] = ifog[x,y]
-        elif(y<f.shape[1]*3):
-        	o[x,y] = ifog[x,y]
-        elif(y<(ifog.shape[1])):
-        	g[x,y] = ifog[x,y]
-
-def ifog_split(a,arr):
-    blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))
-    gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((a.shape[1] + blockDim[1]) - 1) / blockDim[1]))
-
-    d_ifog_split[gridDim,blockDim](a,arr[0],arr[1],arr[2],arr[3])
 
 #CLIP
 

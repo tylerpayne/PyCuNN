@@ -221,6 +221,7 @@ class lstm_layer(object):
 		f = self.gates[1]
 		o = self.gates[2]
 		g = self.gates[3]
+		print(asarray(f))
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
 		for gate in self.gates:
@@ -228,7 +229,7 @@ class lstm_layer(object):
 
 		ifog_activate(self.sum_IFOG,self.gates)
 
-		print(asarray(self.gates[3]))
+		#print(asarray(self.gates[3]))
 		
 		mzero(self.states)
 		mmmult(i,g,self.states)
