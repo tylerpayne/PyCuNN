@@ -115,14 +115,14 @@ class lstm(object):
 					self.last_best_model = [asarray(self.w2),asarray(self.b2)]
 					self.last_best_model.append(asarray(self.hidden_layer.i_IFOG))
 					self.last_best_model.append(asarray(self.hidden_layer.hm1_IFOG))
-					self.lr = self.lr*decay
+					#self.lr = self.lr*decay
 				self.bptt(targets)
 				if seq % batch_size == 0:
-					#print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
+					print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
 					self.updateWeights()
 					time += timer()-st
 					wps = float(w)/time
-					print('ETA',(float(utils.total)/wps)/60.,'min')
+					#print('ETA',(float(utils.total)/wps)/60.,'min')
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
 				self.reset_activations()
