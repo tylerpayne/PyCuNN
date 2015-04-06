@@ -84,10 +84,14 @@ def encode(word):
 	
 
 def decode(arr):
-	a = np.zeros((arr.shape),dtype='float32')
-	arr.copy_to_host(a)
-	index = a.argmax(axis=1)
-	return inv_vocab[index]
+	if not isinstance(arr,basestring):
+		a = np.zeros((arr.shape),dtype='float32')
+		arr.copy_to_host(a)
+		index = a.argmax(axis=1)
+		return inv_vocab[index]
+	else:
+		return arr
+	
 
 
 #############
@@ -226,7 +230,6 @@ def ifog_split(a,arr):
     gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((a.shape[1] + blockDim[1]) - 1) / blockDim[1]))
 
     d_ifog_split[gridDim,blockDim](a,arr[0],arr[1],arr[2],arr[3])
-    print('IFOG',asarray(a[0][1000:]))
 
 
 
@@ -238,10 +241,17 @@ def fp(x,W,b,r):
 
 #BP
 
-def bp(grad,W,gW,gb,h,gradInput):
+def bp(grad,W,gW,gb,h,gradInput=None):
 	mmprod(h,grad,gW,transa='T')
 	mmadd(gb,grad,gb)
-	mmprod(grad,W,gradInput,transb='T')
+	if gradInput is not None:
+		mmprod(grad,W,gradInput,transb='T')
+
+def accum_bp(grad,gW,gb,h):
+	z = cuda.device_array_like(gW)
+	mmprod(h,grad,z,transa='T')
+	mmadd(gW,z,gW)
+	mmadd(gb,grad,gb)
 
 #DOT PRODUCT
 

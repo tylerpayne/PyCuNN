@@ -61,7 +61,8 @@ class lstm(object):
 			#print('Delta',self.delta.asarray())
 			mzero(self.gOutput)
 			mmsubtract(self.outputs[_+1],t[_],self.gOutput)
-			bp(self.gOutput,self.w2,self.gw2,self.gb2,self.hidden_layer.prev_outputs[_+1],self.delta)
+			accum_bp(self.gOutput,self.gw2,self.gb2,self.hidden_layer.prev_outputs[_+1])
+			mmprod(self.gOutput,self.w2,self.delta,transb='T')
 			self.hidden_layer.backward(self.delta,_+1)
 
 	def updateWeights(self):
@@ -82,7 +83,7 @@ class lstm(object):
 		self.updates_tm1 = [mcopy(self.gw2),mcopy(self.gb2)]
 		self.forget()
 
-	def train(self,ds,epochs,batch_size=1,lr=0.09,decay=0.8):
+	def train(self,ds,epochs,batch_size=1,lr=0.09,decay=0.95):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr
 		self.last_best_acc = 0
@@ -261,7 +262,6 @@ class lstm_layer(object):
 
 		mmprod(self.prev_ggates[-1],self.hm1_IFOG,self.recurrentGrad,transb='T')
 
-
 		i = self.prev_gates[t][0]
 		f = self.prev_gates[t][1]
 		o = self.prev_gates[t][2]
@@ -281,8 +281,6 @@ class lstm_layer(object):
 		mzero(self.ec)
 		mmadd(self.ec,grad,self.ec)
 		mmadd(self.ec,self.recurrentGrad,self.ec)
-
-		
 
 		#Loss wrt Cell State
 		mzero(self.temp)
@@ -324,12 +322,8 @@ class lstm_layer(object):
 		#self.clip(self.gradInput)
 
 		#Accumulate Gradients
-
-		mmprod(self.inputs[t],self.ggates,self.gi_IFOG,transa='T')
-		mmprod(self.prev_outputs[t-1],self.ggates,self.ghm1_IFOG,transa='T')
-
-		mmadd(self.gi_b,self.ggates,self.gi_b)
-		mmadd(self.ghm1_b,self.ggates,self.ghm1_b)
+		accum_bp(self.ggates,self.gi_IFOG,self.gi_b,self.inputs[t])
+		accum_bp(self.ggates,self.ghm1_IFOG,self.ghm1_b,self.prev_outputs[t-1])
 
 		#mclip(self.gi_IFOG)
 		#mclip(self.ghm1_IFOG)
@@ -359,7 +353,7 @@ class lstm_layer(object):
 		mmadd(self.ghm1_IFOG,self.updates_tm1[1],self.ghm1_IFOG)
 		mmsubtract(self.hm1_IFOG,self.ghm1_IFOG,self.hm1_IFOG)
 
-
+		print(np.sum(asarray(self.hm1_IFOG)))
 		
 		self.updates_tm1 = [mcopy(self.gi_IFOG),mcopy(self.ghm1_IFOG)]
 		#print(self.i_IFOG.asarray())
