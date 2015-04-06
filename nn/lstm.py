@@ -182,7 +182,7 @@ class lstm_layer(object):
 		self.uplim = uplim
 		self.lowlim = lowlim
 		self.updates_tm1 = [zeros([self.layers[0],self.layers[1]*4]),zeros([self.layers[1],self.layers[1]*4])]
-		self.temp = zeros([1,self.layers[1]])9
+		self.temp = zeros([1,self.layers[1]])
 		self.sum_IFOG = zeros([1,self.layers[1]*4])
 		self.states = zeros([1,self.layers[1]])
 		self.output = zeros([1,self.layers[1]])
