@@ -274,7 +274,7 @@ class lstm_layer(object):
 		mmadd(self.ec,grad,self.ec)
 		mmadd(self.ec,self.recurrentGrad,self.ec)
 
-		print(np.sum(asarray(self.ec)))
+		
 
 		#Loss wrt Cell State
 		mzero(self.temp)
@@ -292,6 +292,8 @@ class lstm_layer(object):
 		msigmoid_deriv(self.ec,o,self.temp)
 		mmmult(self.go,self.temp,self.go)
 
+		print(np.sum(asarray(self.go)))
+
 		#Gradient at Cell Input
 		mtanh_deriv(self.es,g,self.gg)
 		mmmult(self.gg,fi,self.gg)
@@ -308,11 +310,11 @@ class lstm_layer(object):
 		#self.clip(es)
 		self.prev_es.append(mcopy(self.es))
 
-		print(np.sum(asarray(self.gi)))
+		#print(np.sum(asarray(self.gi)))
 
 		ifog_build(self.ggates,[self.gi,self.gf,self.go,self.gg])
 
-		print(np.sum(asarray(self.ggates)))
+		#print(np.sum(asarray(self.ggates)))
 
 		#self.clip(ggates)
 		self.prev_ggates.append(mcopy(self.ggates))
