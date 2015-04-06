@@ -194,19 +194,15 @@ def ifog_activate(gates):
 @cuda.jit('void(float32[:,:],float32[:,:],float32[:,:],float32[:,:],float32[:,:])')
 def d_ifog_build(ifog,i,f,o,g):
     x,y = cuda.grid(2)
-    if (x<ifog.shape[0]):
-    	if (y<i.shape[1]):
+    if (x<i.shape[0] and y < i.shape[1]):
         	ifog[x,y] = i[x,y]
-        if(y<g.shape[1]*2 and y>=i.shape[1]):
-        	ifog[x,y] = f[x,y]
-        if(y<f.shape[1]*3 and y >=g.shape[1]*2):
-        	ifog[x,y] = o[x,y]
-        if(y<(ifog.shape[1]) and y >= f.shape[1]*3):
-        	ifog[x,y] = g[x,y]
+        	ifog[x,y+i.shape[1]] = f[x,y]
+        	ifog[x,y+(i.shape[1]*2)] = o[x,y]
+        	ifog[x,y+(i.shape[1]*3)] = g[x,y]
 
 def ifog_build(ifog,gates):
-    blockDim = (min(30,ifog.shape[0]),min(30,ifog.shape[1]))
-    gridDim = ((((ifog.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((ifog.shape[1] + blockDim[1]) - 1) / blockDim[1]))
+    blockDim = (min(30,gates[0].shape[0]),min(30,gates[0].shape[1]))
+    gridDim = ((((gates[0].shape[0] + blockDim[0]) - 1) / blockDim[0]), (((gates[0].shape[1] + blockDim[1]) - 1) / blockDim[1]))
 
     d_ifog_build[gridDim,blockDim](ifog,gates[0],gates[1],gates[2],gates[3])
 

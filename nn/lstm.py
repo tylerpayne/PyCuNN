@@ -316,10 +316,9 @@ class lstm_layer(object):
 
 		self.prev_es.append(mcopy(self.es))
 
-		self.ggates[:,0:self.layers[1]] = self.gi
-		self.ggates[:,self.layers[1]:self.layers[1]*2] = self.gf
-		self.ggates[:,self.layers[1]*2:self.layers[1]*3] = self.go
-		self.ggates[:,self.layers[1]*3:self.layers[1]*4] = self.gg
+		ifog_build(self.ggates,[self.gi,self.gf,self.go,self.gg])
+
+		print(asarray(self.ggates))
 
 		#self.clip(ggates)
 		self.prev_ggates.append(mcopy(self.ggates))
