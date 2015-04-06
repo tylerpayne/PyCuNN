@@ -236,7 +236,7 @@ def ifog_split(a,arr):
     gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((a.shape[1] + blockDim[1]) - 1) / blockDim[1]))
 
     d_ifog_split[gridDim,blockDim](a,arr[0],arr[1],arr[2],arr[3])
-    print('returning')
+    print('IFOG',ifog[0][1000:])
 
 
 
