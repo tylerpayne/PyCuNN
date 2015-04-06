@@ -227,7 +227,7 @@ class lstm_layer(object):
 		for gate in self.gates:
 			mzero(gate)
 
-		ifog_activate(self.sum_IFOG,self.gates)
+		ifog_activate([i,f,o,g])
 
 		#print(asarray(self.gates[3]))
 		
@@ -261,7 +261,6 @@ class lstm_layer(object):
 		#print(temp.asarray())
 
 		mmprod(self.prev_ggates[-1],self.hm1_IFOG,self.recurrentGrad,transb='T')
-
 
 
 		i = self.prev_gates[t][0]
@@ -304,9 +303,6 @@ class lstm_layer(object):
 		#print('temp',asarray(self.temp)[0])
 		mmmult(self.temp,self.go,self.go)
 		print('aftergo',np.sum(asarray(self.go)))
-
-
-
 
 		#Gradient at Cell Input
 		mtanh_deriv(self.es,g,self.gg)
