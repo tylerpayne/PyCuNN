@@ -301,6 +301,7 @@ class lstm_layer(object):
 		#Gradient at Cell Input
 		mtanh_deriv(self.es,g,self.gg)
 		mmmult(self.gg,fi,self.gg)
+		print('gg',asarray(self.gg))
 
 		#Gradient at Forget Gate
 		msigmoid_deriv(self.es,f,self.gf)
