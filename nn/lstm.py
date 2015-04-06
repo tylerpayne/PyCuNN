@@ -401,7 +401,8 @@ class lstm_layer(object):
 		mzero(self.gg)
 		mzero(self.gf)
 		mzero(self.gi)
-		mzero(self.gb)
+		mzero(self.gi_b)
+		mzero(self.ghm1_b)
 
 
 ds = load_sentences_data('../data/ptb.train.short.txt',gpu=True)
