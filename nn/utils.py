@@ -467,53 +467,6 @@ def update_weights(w,gw,lr):
 
 #ARGMAX
 
-@cuda.jit('void(float32[:,:],int32[:,:],int32[:])')
-def d_margmax(a,amax):
-	sA = cuda.shared.array(shape=(1024),dtype=float32)
-	idx = cuda.threadIdx.x
-	gidx = cuda.grid(1)
-	total = min(cuda.blockDim.x,a.shape[1] - (cuda.blockIdx.x*cuda.blockDim.x))
-	s = total/2
-	if gidx+s < a.shape[1]:
-		if a[0,gidx] > a[0,gidx+s]:
-			sA[idx] = gidx
-		else:
-			sA[idx] = gidx+s
-		cuda.syncthreads()
-		if total%2 == 1:
-				if idx == total-1:
-					if a[0,gidx] > a[0,gidx-idx]:
-						sA[0] = gidx
-		s = s/2
-		while s > 0:
-			if idx < s:
-				if a[0,gidx] > a[0,gidx+s]:
-					sA[idx] = gidx
-				else:
-					sA[idx] = gidx+s
-			cuda.syncthreads()
-			if s%2 == 1 and s > 1:
-				if idx == s-1:
-					if a[0,gidx] > a[0,gidx-idx]:
-						sA[0] = gidx
-			cuda.syncthreads()
-			s = s/2
-		if idx == 0:
-			amax[0,cuda.blockIdx.x] = sA[0]
-
-def margmax(a):
-	blockDim = min(1024,a.shape[1])
-	gridDim = (((a.shape[1]) + blockDim) - 1) / blockDim
-	amax = cuda.device_array((1,gridDim),dtype='int32')
-	d_margmax[gridDim,blockDim](a,amax)
-	while gridDim > 1:
-		print(amax[2])
-		last_gridDim = gridDim
-		blockDim = gridDim
-		gridDim = ((last_gridDim + blockDim) - 1) / blockDim
-		bmax = cuda.device_array((1,gridDim),dtype='int32')
-		d_margmax[gridDim,blockDim](amax,bmax)
-	return bmax
 
 
 
