@@ -182,13 +182,8 @@ class lstm_layer(object):
 		self.uplim = uplim
 		self.lowlim = lowlim
 		self.updates_tm1 = [zeros([self.layers[0],self.layers[1]*4]),zeros([self.layers[1],self.layers[1]*4])]
-		self.temp = zeros([1,self.layers[1]])
-		i = zeros([1,self.layers[1]])
-		f = zeros([1,self.layers[1]])
-		o = zeros([1,self.layers[1]])
-		g = zeros([1,self.layers[1]])
+		self.temp = zeros([1,self.layers[1]])9
 		self.sum_IFOG = zeros([1,self.layers[1]*4])
-		self.gates=[i,f,o,g]
 		self.states = zeros([1,self.layers[1]])
 		self.output = zeros([1,self.layers[1]])
 		self.recurrentGrad = zeros([1,self.layers[1]*4])
@@ -207,11 +202,6 @@ class lstm_layer(object):
 		self.forget()
 
 	def forward(self,x):
-		mzero(self.temp)
-
-		for gate in self.gates:
-			mzero(gate)
-
 		mmprod(x,self.i_IFOG,self.sum_IFOG)
 		mmadd(self.sum_IFOG,self.i_b,self.sum_IFOG)
 		mmprod(self.prev_outputs[-1],self.hm1_IFOG,self.temp)
@@ -224,20 +214,14 @@ class lstm_layer(object):
 		#print(asarray(self.sum_IFOG))
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
-		for gate in self.gates:
-			mzero(gate)
-
 		ifog_activate([i,f,o,g])
 
 		#print(asarray(self.gates[3]))
 		
-		mzero(self.states)
 		mmmult(i,g,self.states)
-		mzero(self.temp)
 		mmmult(f,self.prev_states[-1],self.temp)
 		mmadd(self.states,self.temp,self.states)
 
-		mzero(self.output)
 		mtanh(self.states,self.output)
 		mmmult(self.output,o,self.output)
 
@@ -251,13 +235,6 @@ class lstm_layer(object):
 
 	def backward(self,grad,t):
 		#print('prev_gc',self.prev_gc[-1].asarray())
-
-		mzero(self.temp)
-		mzero(self.recurrentGrad)
-		mzero(self.gi)
-		mzero(self.gf)
-		mzero(self.go)
-		mzero(self.gg)
 		#print(temp.asarray())
 
 		mmprod(self.prev_ggates[-1],self.hm1_IFOG,self.recurrentGrad,transb='T')
@@ -278,18 +255,12 @@ class lstm_layer(object):
 
 		ff_tp1 = self.prev_fgates[t+1][1]
 
-		mzero(self.ec)
-		mmadd(self.ec,grad,self.ec)
-		mmadd(self.ec,self.recurrentGrad,self.ec)
+		mmadd(grad,self.recurrentGrad,self.ec)
 
 		#Loss wrt Cell State
-		mzero(self.temp)
 		mtanh_deriv(self.ec,s,self.temp)
 		#print(t,self.temp.shape,fo.shape,self.es.shape)
 		mmmult(self.temp,fo,self.es)
-		
-		mzero(self.temp)
-
 		mmmult(ff_tp1,es_tp1,self.temp)
 		mmadd(self.es,self.temp,self.es)
 
@@ -390,7 +361,7 @@ class lstm_layer(object):
 ds = load_sentences_data('../data/ptb.train.short.txt',gpu=True)
 
 n_tokens = utils.word_idx
-net = lstm([n_tokens,800,n_tokens])
+net = lstm([n_tokens,1000,n_tokens])
 
 start = timer()
 print('Starting Training')
@@ -403,7 +374,7 @@ net.last_best()
 net.forget()
 
 
-sent = [ds[10][0]]
+sent = [decode(ds[10][0])]
 for i in range(15):
 	x = encode(sent[-1])
 	y = self.forward(x)
