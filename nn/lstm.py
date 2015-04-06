@@ -217,11 +217,12 @@ class lstm_layer(object):
 		mmadd(self.temp,self.hm1_b,self.temp)
 		mmadd(self.sum_IFOG,self.temp,self.sum_IFOG)
 		ifog_split(self.sum_IFOG,self.gates)
+		print(asarray(self.gates[1]))
 		i = self.gates[0]
 		f = self.gates[1]
 		o = self.gates[2]
 		g = self.gates[3]
-		print(asarray(self.sum_IFOG))
+		#print(asarray(self.sum_IFOG))
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
 		for gate in self.gates:
