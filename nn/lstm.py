@@ -218,7 +218,6 @@ class lstm_layer(object):
 		f = self.gates[1]
 		o = self.gates[2]
 		g = self.gates[3]
-		print('i',asarray(i))
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
 		for gate,bias in zip(self.gates,self.biases):
@@ -301,7 +300,7 @@ class lstm_layer(object):
 		#print('go',asarray(self.go)[0])
 		#print('temp',asarray(self.temp)[0])
 		mmmult(self.temp,self.go,self.go)
-		#print('aftergo',np.sum(asarray(self.go)))
+		print('aftergo',np.sum(asarray(self.go)))
 
 
 
