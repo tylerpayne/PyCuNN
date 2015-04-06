@@ -252,6 +252,8 @@ class lstm_layer(object):
 
 		mmprod(self.prev_ggates[-1],self.hm1_IFOG,self.recurrentGrad,transb='T')
 
+
+
 		i = self.prev_gates[t][0]
 		f = self.prev_gates[t][1]
 		o = self.prev_gates[t][2]
@@ -304,15 +306,17 @@ class lstm_layer(object):
 		#self.clip(es)
 		self.prev_es.append(mcopy(self.es))
 
+		print(np.sum(asarray(self.gi)))
+
 		ifog_build(self.ggates,[self.gi,self.gf,self.go,self.gg])
+
+		print(np.sum(asarray(self.ggates)))
 
 		#self.clip(ggates)
 		self.prev_ggates.append(mcopy(self.ggates))
 
 		#self.gradInput = cm.dot(ggates,self.i_IFOG.T)
 		#self.clip(self.gradInput)
-
-		print(np.sum(asarray(self.ghm1_IFOG)))
 
 		#Accumulate Gradients
 
