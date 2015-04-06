@@ -327,8 +327,18 @@ class lstm_layer(object):
 		#self.clip(self.ghm1_IFOG)
 		mclip(self.gi_IFOG)
 		mclip(self.ghm1_IFOG)
-		update_weights(self.i_IFOG,self.gi_IFOG,lr)
-		update_weights(self.hm1_IFOG,self.ghm1_IFOG,lr)
+
+		msmult(self.gi_IFOG,self.lr,self.gi_IFOG)
+		msmult(self.updates_tm1[0],0.9,self.updates_tm1[0])
+		mmadd(self.gi_IFOG,self.updates_tm1[0],self.gi_IFOG)
+		mmsubtract(self.i_IFOG,self.gi_IFOG,self.i_IFOG)
+
+		msmult(self.ghm1_IFOG,self.lr,self.ghm1_IFOG)
+		msmult(self.updates_tm1[1],0.9,self.updates_tm1[1])
+		mmadd(self.ghm1_IFOG,self.updates_tm1[1],self.ghm1_IFOG)
+		mmsubtract(self.hm1_IFOG,self.ghm1_IFOG,self.hm1_IFOG)
+		
+		self.updates_tm1 = [mcopy(self.gi_IFOG),mcopy(self.ghm1_IFOG)]
 		#print(self.i_IFOG.asarray())
 
 	def forget(self):
@@ -343,6 +353,7 @@ class lstm_layer(object):
 		self.prev_fgates =[[zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]])]]
 		self.prev_ggates =[zeros([1,self.layers[1]*4])]
 		self.inputs = [zeros([1,self.layers[0]])]
+		self.updates_tm1 = [zeros([self.layers[0],self.layers[1]*4]),zeros([self.layers[1],self.layers[1]*4])]
 
 		self.prev_es = [zeros([1,self.layers[1]])]
 
