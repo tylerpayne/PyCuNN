@@ -192,6 +192,8 @@ def ifog_activate(ifog,gates):
     blockDim = (min(30,ifog.shape[0]),min(30,ifog.shape[1]))
     gridDim = ((((ifog.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((ifog.shape[1] + blockDim[1]) - 1) / blockDim[1]))
 
+    print(ifog.shape,blockDim,gridDim)
+
     d_ifog_activate[gridDim,blockDim](ifog,gates[0],gates[1],gates[2],gates[3])
 
 #IFOG BUILD
