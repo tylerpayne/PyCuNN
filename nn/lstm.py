@@ -82,7 +82,7 @@ class lstm(object):
 		self.updates_tm1 = [mcopy(self.gw2),mcopy(self.gb2)]
 		self.forget()
 
-	def train(self,ds,epochs,batch_size=1,lr=0.08,decay=0.99):
+	def train(self,ds,epochs,batch_size=1,lr=0.09,decay=0.8):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr
 		self.last_best_acc = 0
@@ -109,16 +109,9 @@ class lstm(object):
 					if utils.vocab[decode(x[t+1])] == asarray(self.outputs[-1]).argmax(axis=1):
 						correct += 1
 				#print(targets)
-				acc = float(correct)/float(count)
-				if acc > self.last_best_acc:
-					self.last_best_acc = acc
-					self.last_best_model = [asarray(self.w2),asarray(self.b2)]
-					self.last_best_model.append(asarray(self.hidden_layer.i_IFOG))
-					self.last_best_model.append(asarray(self.hidden_layer.hm1_IFOG))
-					self.lr = self.lr*decay
 				self.bptt(targets)
 				if seq % batch_size == 0:
-					print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
+					#print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
 					self.updateWeights()
 					time += timer()-st
 					wps = float(w)/time
@@ -126,8 +119,15 @@ class lstm(object):
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
 				self.reset_activations()
+			acc = float(correct)/float(count)
+			if acc > self.last_best_acc:
+				self.last_best_acc = acc
+				self.last_best_model = [asarray(self.w2),asarray(self.b2)]
+				self.last_best_model.append(asarray(self.hidden_layer.i_IFOG))
+				self.last_best_model.append(asarray(self.hidden_layer.hm1_IFOG))
+				self.lr = self.lr*decay
 			time = timer() - start
-			sent = [ds[10][0]]
+			sent = [decode(ds[10][0])]
 			for i in range(15):
 				x = encode(sent[-1])
 				y = self.forward(x)
