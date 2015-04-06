@@ -118,7 +118,7 @@ class lstm(object):
 					self.lr = self.lr*decay
 				self.bptt(targets)
 				if seq % batch_size == 0:
-					#print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
+					print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
 					self.updateWeights()
 					time += timer()-st
 					wps = float(w)/time
