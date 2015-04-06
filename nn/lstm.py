@@ -222,7 +222,7 @@ class lstm_layer(object):
 		g = self.gates[3]
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
-		for gate,bias in self.gates:
+		for gate in self.gates:
 			mzero(gate)
 
 		ifog_activate(self.sum_IFOG,self.gates)
