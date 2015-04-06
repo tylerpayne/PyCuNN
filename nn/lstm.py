@@ -217,10 +217,10 @@ class lstm_layer(object):
 		mmadd(self.temp,self.hm1_b,self.temp)
 		mmadd(self.sum_IFOG,self.temp,self.sum_IFOG)
 		print('copying')
-		i = self.sum_IFOG[0,0:self.layers[1]]
-		f = self.sum_IFOG[0,self.layers[1]:self.layers[1]*2]
-		o = self.sum_IFOG[0,self.layers[1]*2:self.layers[1]*3]
-		g = self.sum_IFOG[0,self.layers[1]*3:self.layers[1]*4]
+		i[0] = self.sum_IFOG[0,0:self.layers[1]]
+		f[0] = self.sum_IFOG[0,self.layers[1]:self.layers[1]*2]
+		o[0] = self.sum_IFOG[0,self.layers[1]*2:self.layers[1]*3]
+		g[0] = self.sum_IFOG[0,self.layers[1]*3:self.layers[1]*4]
 		#print(asarray(self.sum_IFOG))
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
