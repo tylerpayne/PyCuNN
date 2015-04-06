@@ -83,7 +83,7 @@ class lstm(object):
 		self.updates_tm1 = [mcopy(self.gw2),mcopy(self.gb2)]
 		self.forget()
 
-	def train(self,ds,epochs,batch_size=100,lr=0.03,decay=0.95):
+	def train(self,ds,epochs,batch_size=1000,lr=0.01,decay=0.95):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr
 		self.last_best_acc = 0
@@ -295,6 +295,11 @@ class lstm_layer(object):
 		accum_bp(self.ggates,self.gi_IFOG,self.gi_b,self.inputs[t])
 		accum_bp(self.ggates,self.ghm1_IFOG,self.ghm1_b,self.prev_outputs[t-1])
 
+		mclip(self.gi_IFOG)
+		mclip(self.gi_b)
+		mclip(self.ghm1_b)
+		mclip(self.ghm1_IFOG)
+
 		#mclip(self.gi_IFOG)
 		#mclip(self.ghm1_IFOG)
 
@@ -302,10 +307,7 @@ class lstm_layer(object):
 
 	def updateWeights(self,lr):
 		#self.clip(self.ghm1_IFOG)
-		mclip(self.gi_IFOG)
-		mclip(self.gi_b)
-		mclip(self.ghm1_b)
-		mclip(self.ghm1_IFOG)
+		
 
 		msmult(self.gi_b,lr,self.gi_b)
 		mmsubtract(self.i_b,self.gi_b,self.i_b)
