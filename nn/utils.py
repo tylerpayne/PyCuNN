@@ -181,11 +181,11 @@ def d_ifog_activate(ifog,i,f,o,g):
     if (x<ifog.shape[0]):
     	if (y<i.shape[1]):
         	i[x,y] = d_sigmoid(ifog[x,y])
-        elif(y<g.shape[1]*2):
+        if(y<g.shape[1]*2 and y>=i.shape[1]):
         	f[x,y] = d_sigmoid(ifog[x,y])
-        elif(y<f.shape[1]*3):
+        if(y<f.shape[1]*3 and y >=g.shape[1]*2):
         	o[x,y] = d_sigmoid(ifog[x,y])
-        elif(y<(ifog.shape[1])):
+        if(y<(ifog.shape[1]) and y >= f.shape[1]*3):
         	g[x,y] = math.tanh(ifog[x,y])
 
 def ifog_activate(ifog,gates):
@@ -203,11 +203,11 @@ def d_ifog_build(ifog,i,f,o,g):
     if (x<ifog.shape[0]):
     	if (y<i.shape[1]):
         	ifog[x,y] = i[x,y]
-        elif(y<g.shape[1]*2):
+        if(y<g.shape[1]*2 and y>=i.shape[1]):
         	ifog[x,y] = f[x,y]
-        elif(y<f.shape[1]*3):
+        if(y<f.shape[1]*3 and y >=g.shape[1]*2):
         	ifog[x,y] = o[x,y]
-        elif(y<(ifog.shape[1])):
+        if(y<(ifog.shape[1]) and y >= f.shape[1]*3):
         	ifog[x,y] = g[x,y]
 
 def ifog_build(ifog,gates):
@@ -224,11 +224,11 @@ def d_ifog_split(ifog,i,f,o,g):
     if (x<ifog.shape[0]):
     	if (y<i.shape[1]):
         	i[x,y] = ifog[x,y]
-        elif(y<f.shape[1]*2):
+        if(y<g.shape[1]*2 and y>=i.shape[1]):
         	f[x,y] = ifog[x,y]
-        elif(y<o.shape[1]*3):
+        if(y<f.shape[1]*3 and y >=g.shape[1]*2):
         	o[x,y] = ifog[x,y]
-        elif(y<(ifog.shape[1])):
+        if(y<(ifog.shape[1]) and y >= f.shape[1]*3):
         	g[x,y] = ifog[x,y]
 
 def ifog_split(a,arr):
