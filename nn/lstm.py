@@ -122,7 +122,7 @@ class lstm(object):
 					self.updateWeights()
 					time += timer()-st
 					wps = float(w)/time
-					#print('ETA',(float(utils.total)/wps)/60.,'min')
+					print('ETA',(float(utils.total)/wps)/60.,'min')
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
 				self.reset_activations()
@@ -358,7 +358,7 @@ class lstm_layer(object):
 		mzero(self.gi)
 
 
-ds = load_sentences_data('../data/ptb.train.short.txt',gpu=True)
+ds = load_sentences_data('../data/ptb.train.txt',gpu=True)
 
 n_tokens = utils.word_idx
 net = lstm([n_tokens,800,n_tokens])
