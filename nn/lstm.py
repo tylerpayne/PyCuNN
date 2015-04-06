@@ -221,7 +221,7 @@ class lstm_layer(object):
 		f = self.gates[1]
 		o = self.gates[2]
 		g = self.gates[3]
-		print(asarray(f))
+		print(asarray(self.sum_IFOG))
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
 		for gate in self.gates:
