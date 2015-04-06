@@ -180,13 +180,13 @@ def d_ifog_activate(ifog,i,f,o,g):
     x,y = cuda.grid(2)
     if (x<ifog.shape[0]):
     	if (y<i.shape[1]):
-        	i[x,y] = d_sigmoid(ifog[x,y]) + ib[x,y]
+        	i[x,y] = d_sigmoid(ifog[x,y])
         elif(y<g.shape[1]*2):
-        	f[x,y] = d_sigmoid(ifog[x,y]) + fb[x,y]
+        	f[x,y] = d_sigmoid(ifog[x,y])
         elif(y<f.shape[1]*3):
-        	o[x,y] = d_sigmoid(ifog[x,y]) + ob[x,y]
+        	o[x,y] = d_sigmoid(ifog[x,y])
         elif(y<(ifog.shape[1])):
-        	g[x,y] = math.tanh(ifog[x,y]) + gb[x,y]
+        	g[x,y] = math.tanh(ifog[x,y])
 
 def ifog_activate(ifog,gates):
     blockDim = (min(30,ifog.shape[0]),min(30,ifog.shape[1]))
