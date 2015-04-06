@@ -299,15 +299,11 @@ class lstm_layer(object):
 		#Gradient at Output Gates
 		mtanh(s,self.temp)
 		msigmoid_deriv(self.ec,o,self.go)
-		#print('go',asarray(self.go)[0])
-		#print('temp',asarray(self.temp)[0])
 		mmmult(self.temp,self.go,self.go)
-		print('aftergo',np.sum(asarray(self.go)))
 
 		#Gradient at Cell Input
 		mtanh_deriv(self.es,g,self.gg)
 		mmmult(self.gg,fi,self.gg)
-		#print('gg',asarray(self.gg))
 
 		#Gradient at Forget Gate
 		msigmoid_deriv(self.es,f,self.gf)
@@ -318,14 +314,12 @@ class lstm_layer(object):
 		mtanh(g,self.gi)
 		mmmult(self.gi,self.temp,self.gi)
 
-		#self.clip(es)
 		self.prev_es.append(mcopy(self.es))
 
-		#print(np.sum(asarray(self.gi)))
-
-		ifog_build(self.ggates,[self.gi,self.gf,self.go,self.gg])
-
-		#print(np.sum(asarray(self.ggates)))
+		self.ggates[:,0:self.layers[1]] = self.gi
+		self.ggates[:,self.layers[1]:self.layers[1]*2] = self.gf
+		self.ggates[:,self.layers[1]*2:self.layers[1]*3] = self.go
+		self.ggates[:,self.layers[1]*3:self.layers[1]*4] = self.gg
 
 		#self.clip(ggates)
 		self.prev_ggates.append(mcopy(self.ggates))
