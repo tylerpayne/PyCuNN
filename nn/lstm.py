@@ -274,6 +274,8 @@ class lstm_layer(object):
 		mmadd(self.ec,grad,self.ec)
 		mmadd(self.ec,self.recurrentGrad,self.ec)
 
+		print(np.sum(asarray(self.ec)))
+
 		#Loss wrt Cell State
 		mzero(self.temp)
 		mtanh_deriv(self.ec,s,self.temp)
