@@ -295,10 +295,7 @@ class lstm_layer(object):
 		accum_bp(self.ggates,self.gi_IFOG,self.gi_b,self.inputs[t])
 		accum_bp(self.ggates,self.ghm1_IFOG,self.ghm1_b,self.prev_outputs[t-1])
 
-		mclip(self.gi_IFOG)
-		mclip(self.gi_b)
-		mclip(self.ghm1_b)
-		mclip(self.ghm1_IFOG)
+		
 
 		#mclip(self.gi_IFOG)
 		#mclip(self.ghm1_IFOG)
@@ -307,6 +304,11 @@ class lstm_layer(object):
 
 	def updateWeights(self,lr):
 		#self.clip(self.ghm1_IFOG)
+
+		mclip(self.gi_IFOG)
+		mclip(self.gi_b)
+		mclip(self.ghm1_b)
+		mclip(self.ghm1_IFOG)
 		
 
 		msmult(self.gi_b,lr,self.gi_b)
