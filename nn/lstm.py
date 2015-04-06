@@ -218,6 +218,7 @@ class lstm_layer(object):
 		f = self.gates[1]
 		o = self.gates[2]
 		g = self.gates[3]
+		print(asarray(o))
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
 		for gate,bias in zip(self.gates,self.biases):
