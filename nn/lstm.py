@@ -106,8 +106,8 @@ class lstm(object):
 					tarval = encode(x[t+1])
 					self.forward(inval)
 					targets.append(tarval)
-					#if utils.vocab[x[t+1]] == asarray(self.outputs[-1]).argmax(axis=1):
-						#correct += 1
+					if utils.vocab[decode(x[t+1])] == asarray(self.outputs[-1]).argmax(axis=1):
+						correct += 1
 				#print(targets)
 				acc = float(correct)/float(count)
 				if acc > self.last_best_acc:
@@ -358,7 +358,7 @@ class lstm_layer(object):
 		mzero(self.gi)
 
 
-ds = load_sentences_data('../data/ptb.train.txt',gpu=True)
+ds = load_sentences_data('../data/ptb.train.txt')
 
 n_tokens = utils.word_idx
 net = lstm([n_tokens,800,n_tokens])
