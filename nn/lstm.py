@@ -216,12 +216,11 @@ class lstm_layer(object):
 		mmprod(self.prev_outputs[-1],self.hm1_IFOG,self.temp)
 		mmadd(self.temp,self.hm1_b,self.temp)
 		mmadd(self.sum_IFOG,self.temp,self.sum_IFOG)
-		ifog_split(self.sum_IFOG,self.gates)
 		print('copying')
-		i = self.gates[0]
-		f = self.gates[1]
-		o = self.gates[2]
-		g = self.gates[3]
+		i = self.sum_IFOG[:][:self.layers[1]]
+		f = self.sum_IFOG[:][self.layers[1]:self.layers[1]*2]
+		o = self.sum_IFOG[:][self.layers[1]*2:self.layers[1]*3]
+		g = self.sum_IFOG[:][self.layers[1]*3:]
 		#print(asarray(self.sum_IFOG))
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
