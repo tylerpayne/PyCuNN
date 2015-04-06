@@ -118,7 +118,7 @@ class lstm(object):
 					self.lr = self.lr*decay
 				self.bptt(targets)
 				if seq % batch_size == 0:
-					print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
+					#print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
 					self.updateWeights()
 					time += timer()-st
 					wps = float(w)/time
@@ -358,7 +358,7 @@ class lstm_layer(object):
 		mzero(self.gi)
 
 
-ds = load_sentences_data('../data/ptb.train.txt')
+ds = load_sentences_data('../data/ptb.train.short.txt')
 
 n_tokens = utils.word_idx
 net = lstm([n_tokens,800,n_tokens])
