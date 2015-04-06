@@ -293,7 +293,7 @@ class lstm_layer(object):
 		print('go',np.sum(asarray(self.go)))
 		print('temp',np.sum(asarray(self.temp)))
 		mmmult(self.go,self.temp,self.go)
-
+		print('aftergo',np.sum(asarray(self.go)))
 
 
 
