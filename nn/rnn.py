@@ -108,15 +108,15 @@ class rnn(object):
 					tarval = encode(x[t+1])
 					self.forward(inval)
 					targets.append(tarval)
-					if utils.vocab[x[t+1]] == asarray(self.outputs[-1]).argmax(axis=1):
-						correct += 1
+					#if utils.vocab[x[t+1]] == asarray(self.outputs[-1]).argmax(axis=1):
+						#correct += 1
 				#print(targets)
 				acc = float(correct)/float(count)
 				self.bptt(targets)
 				
 				if seq % batch_size == 0:
 					#print(self.outputs[-1])
-					print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
+					#print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
 					#print('gw2',self.gw2.asarray(),'gb2',self.gb2.asarray(),'iifog',cm.sum(self.hidden_layer.gi_IFOG,axis=1).sum(axis=0).asarray(),'hifog',self.hidden_layer.hm1_IFOG.asarray())
 					self.updateWeights()
 					time += timer()-st
@@ -161,8 +161,8 @@ class rnn(object):
 		self.reset_grads()
 		self.reset_activations()
 
-ds = load_sentences_data('../data/ptb.train.short.txt')
+ds = load_sentences_data('../data/ptb.train.short.txt',gpu=True)
 
 net = rnn([utils.word_idx,1000,utils.word_idx])
 
-net.train(ds,10)
+net.train(ds,65)

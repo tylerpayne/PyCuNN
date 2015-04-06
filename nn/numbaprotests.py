@@ -27,22 +27,22 @@ def run():
     """
     gc.collect()
 
-    a = np.ones((1,5000),dtype='float32')/2
-    c = np.zeros((1,5000),dtype='float32')
+    a = np.array(np.random.rand(1,5000),dtype='float32')
+    c = np.zeros((1,1),dtype='int32')
     z = np.zeros((200,400),dtype='float32')
     #o = np.zeros((3000,200),dtype='float32')
     da = cuda.to_device(a)
     dc = cuda.to_device(c)
 
-    #print(np.sum(a,axis=1))
+    print(np.argmax(a,axis=1))
 
     start = timer()
-    msoftmax(da,dc)
+    g = margmax(da)
     cutime = timer()-start
     print('cutime',cutime)
 
-    dc.copy_to_host(c)
-    print('CU',np.sum(c))
+    g.copy_to_host(c)
+    print('CU',c)
 
     '''b = cm.CUDAMatrix(a)
     d = cm.CUDAMatrix(c)
