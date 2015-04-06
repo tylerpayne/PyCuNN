@@ -354,7 +354,7 @@ class lstm_layer(object):
 		mclip(self.ghm1_b)
 		mclip(self.ghm1_IFOG)
 
-		msmult(self.gb,lr,self.gb)
+		msmult(self.gi_b,lr,self.gi_b)
 		mmsubtract(self.i_b,self.gi_b,self.i_b)
 
 		msmult(self.ghm1_b,lr,self.ghm1_b)
