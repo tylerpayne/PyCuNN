@@ -445,10 +445,10 @@ def mcopy(a):
 def d_mclip(a):
     x,y = cuda.grid(2)
     if (x < a.shape[0]) and (y <a.shape[1]):
-        if (a[x,y] > 1.):
-        	a[x,y] = 1.
-        if (a[x,y] < -1.):
-        	a[x,y] = -1.
+        if (a[x,y] > 15.):
+        	a[x,y] = 15.
+        if (a[x,y] < -15.):
+        	a[x,y] = -15.
 
 def mclip(a):
     blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))
