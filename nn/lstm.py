@@ -285,22 +285,12 @@ class lstm_layer(object):
 
 		ifog_build(self.ggates,[self.gi,self.gf,self.go,self.gg])
 
-		#self.clip(ggates)
 		self.prev_ggates.append(mcopy(self.ggates))
-
-		#self.gradInput = cm.dot(ggates,self.i_IFOG.T)
-		#self.clip(self.gradInput)
 
 		#Accumulate Gradients
 		accum_bp(self.ggates,self.gi_IFOG,self.gi_b,self.inputs[t])
 		accum_bp(self.ggates,self.ghm1_IFOG,self.ghm1_b,self.prev_outputs[t-1])
 
-		
-
-		#mclip(self.gi_IFOG)
-		#mclip(self.ghm1_IFOG)
-
-		#print(fo.shape)
 
 	def updateWeights(self,lr):
 		#self.clip(self.ghm1_IFOG)
