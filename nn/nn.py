@@ -4,6 +4,7 @@ from utils import *
 from numbapro import cuda
 from timeit import default_timer as timer
 from scipy.spatial.distance import euclidean as euc
+import pickle
 
 class nn(object):
 	def __init__(self, layers):
@@ -92,14 +93,14 @@ ds = load_words_data('../data/ptb.train.txt')
 
 net = nn([utils.word_idx,1000,utils.word_idx])
 
-net.train(ds,10)
+net.train(ds,100)
 
 lookup = []
 vectors = []
 for x in range(utils.word_idx):
 	word = utils.inv_vocab[x]
 	net.forward(encode(word))
-	vectors.append(asarray(net.h)[0])
+	vectors.append(asarray(net.h))
 	lookup.append(word)
 
 for z in range(10):
@@ -108,14 +109,18 @@ for z in range(10):
 	w = vectors[25+z]
 	for x in range(utils.word_idx):
 		if x is not 25+z:
-			if euc(w,vectors[x]) < dist:
+			if euc(w[0],vectors[x][0]) < dist:
 				print('New Best:', lookup[x])
-				dist = euc(w,vectors[x])
+				dist = euc(w[0],vectors[x][0])
 				idx = x
 	print('Closest to',lookup[25+z],'is',lookup[idx])
 
 
+lpath = open('lookup.pickle','w')
+vpath = open('vectors.pickle','w')
 
+pickle.dump(lookup,lpath)
+pickle.dump(vectors,vpath)
 
 
 

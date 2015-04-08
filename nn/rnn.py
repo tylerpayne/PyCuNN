@@ -2,6 +2,8 @@ import numpy as np
 from timeit import default_timer as timer
 import utils
 from utils import *
+from scipy.spatial.distance import euclidean as euc
+import pickle
 
 class rnn(object):
 	def __init__(self, layers):
@@ -43,7 +45,7 @@ class rnn(object):
 		mmadd(self.h,self.r,self.h)
 		mtanh(self.h,self.h)
 		fp(self.h,self.w2,self.b2,self.output)
-		msoftmax(self.output,self.output)
+		mtanh(self.output,self.output)
 		self.inputs.append(mcopy(x))
 		self.hs.append(mcopy(self.h))
 		self.outputs.append(mcopy(self.output))
@@ -52,7 +54,7 @@ class rnn(object):
 	def bptt(self,t):
 		for q in range(len(t)-2):
 			mmsubtract(self.outputs[-1],t[-1],self.gOutput)
-			print('gOuptut',np.sum(asarray(self.gOutput),axis=1))
+			#print('gOuptut',np.sum(asarray(self.gOutput),axis=1))
 			bp(self.gOutput,self.w2,self.gw2,self.gb2,self.hs[-1],self.delta)
 
 			mmadd(self.delta,self.gRecurrent,self.delta)
@@ -98,16 +100,16 @@ class rnn(object):
 				for t in range(len(x)-1):
 					count += 1
 					w += 1
-					inval = encode(x[t])
-					tarval = encode(x[t+1])
+					inval = cuda.to_device(vectors[utils.vocab[x[t]]])
+					tarval = cuda.to_device(vectors[utils.vocab[x[t+1]]])
 					self.forward(inval)
 					targets.append(tarval)
-					if utils.vocab[decode(x[t+1])] == asarray(self.outputs[-1]).argmax(axis=1):
+					if closest(asarray(self.outputs[-1])) == x[t+1]:
 						correct += 1
 				#print(targets)
 				acc = float(correct)/float(count)
 				self.bptt(targets)
-				print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
+				print('Outputs:',closest(asarray(self.outputs[-2])),closest(asarray(self.outputs[-1])),'Input',x[-2],'Target',utils.decode(targets[-1]))
 				#print('gw2',self.gw2.asarray(),'gb2',self.gb2.asarray(),'iifog',cm.sum(self.hidden_layer.gi_IFOG,axis=1).sum(axis=0).asarray(),'hifog',self.hidden_layer.hm1_IFOG.asarray())
 				self.updateWeights()
 				time += timer()-st
@@ -119,9 +121,9 @@ class rnn(object):
 			time = timer() - start
 			sent = [ds[10][0]]
 			for i in range(15):
-				x = encode(sent[-1])
+				x = cuda.to_device(vectors[utils.vocab[sent[-1]]])
 				y = self.forward(x)
-				sent.append(decode(y))
+				sent.append(closest(asarray(y)))
 			self.forget()
 			print('Trained Epoch:',epoch+1,"With Accuracy:",acc, 'in', time, 'seconds', 'Learning Rate:',self.lr, 'wps',wps)
 			print('Generated Sentence:',sent)
@@ -157,6 +159,21 @@ class rnn(object):
 
 ds = load_sentences_data('../data/ptb.train.short.txt')
 
-net = rnn([utils.word_idx,1000,utils.word_idx])
+global lookup
+global vectors
+lookup = pickle.load(open('lookup.pickle','r'))
+vectors = pickle.load(open('vectors.pickle','r'))
+
+def closest(x):
+	dist = 1000
+	idx = 0
+	for i in range(utils.word_idx):
+		if euc(x[0],vectors[i][0]) < dist:
+			dist = euc(x[0],vectors[i][0])
+			idx = i
+	return lookup[idx]
+
+
+net = rnn([500,1000,500])
 
 net.train(ds,65)
