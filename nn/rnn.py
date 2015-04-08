@@ -86,7 +86,7 @@ class rnn(object):
 		#print(asarray(self.w1))
 		self.forget()
 
-	def train(self,ds,epochs,batch_size=1,lr=0.01,decay=0.99):
+	def train(self,ds,epochs,lr=0.01,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr
 		acc = 0
@@ -114,14 +114,12 @@ class rnn(object):
 				acc = float(correct)/float(count)
 				self.bptt(targets)
 				
-				if seq % batch_size == 0:
-					#print(self.outputs[-1])
-					#print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
-					#print('gw2',self.gw2.asarray(),'gb2',self.gb2.asarray(),'iifog',cm.sum(self.hidden_layer.gi_IFOG,axis=1).sum(axis=0).asarray(),'hifog',self.hidden_layer.hm1_IFOG.asarray())
-					self.updateWeights()
-					time += timer()-st
-					wps = float(w)/time
-					#print('wps:',wps,"eta:",(float(utils.total)/wps)/60,'min')
+				#print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
+				#print('gw2',self.gw2.asarray(),'gb2',self.gb2.asarray(),'iifog',cm.sum(self.hidden_layer.gi_IFOG,axis=1).sum(axis=0).asarray(),'hifog',self.hidden_layer.hm1_IFOG.asarray())
+				self.updateWeights()
+				time += timer()-st
+				wps = float(w)/time
+				#print('wps:',wps,"eta:",(float(utils.total)/wps)/60,'min')
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
 				self.reset_activations()
@@ -161,7 +159,7 @@ class rnn(object):
 		self.reset_grads()
 		self.reset_activations()
 
-ds = load_sentences_data('../data/ptb.train.short.txt',gpu=True)
+ds = load_sentences_data('../data/ptb.train.short.txt')
 
 net = rnn([utils.word_idx,1000,utils.word_idx])
 

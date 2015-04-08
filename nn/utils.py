@@ -39,7 +39,31 @@ def asarray(a):
 	a.copy_to_host(x)
 	return x
 
-def load_sentences_data(fname,gpu=False):
+def load_words_data(fname,gpu=False):
+	print('Building Dataset')
+	global vocab
+	vocab = {}
+	global inv_vocab
+	inv_vocab = []
+	global word_idx
+	word_idx = 0
+	global total
+	with open(fname,'r+') as doc:
+		f = doc.read()
+		words = f.split(' ')
+		total = len(words)
+
+	ds = []
+	for i in range(len(words)-1):
+		if words[i] not in vocab:
+			vocab[words[i]] = word_idx
+			inv_vocab.append(words[i])
+			word_idx += 1
+		ds.append(words[i])
+	print('Dataset is Ready')
+	return ds
+
+def load_sentences_data(fname,gpu=False,batch_size=1):
 	print('Building Dataset')
 	global vocab
 	vocab = {}
@@ -61,24 +85,44 @@ def load_sentences_data(fname,gpu=False):
 			inv_vocab.append(words[i])
 			word_idx += 1
 	ds = []
-	for seq in sentences:
-		seq = seq.split(' ')
-		del seq[0]
-		del seq[-1]
-		sent = []
-		for w in seq:
-			if gpu == True:
-				w = encode(w)
-			sent.append(w)
-		ds.append(sent)
+	if batch_size == 1:
+		for seq in sentences:
+			seq = seq.split(' ')
+			del seq[0]
+			del seq[-1]
+			sent = []
+			for w in seq:
+				if gpu == True:
+					w = encode(w)
+				sent.append(w)
+			ds.append(sent)
+	else:
+		count = 0
+		for seq in sentences:
+			seq = seq.split(' ')
+			del seq[0]
+			del seq[-1]
+			sent = encode(seq[0],gpu=False)
+			tar = encode(seq[1],gpu=False)
+			for w in xrange(1,len(seq)-1):
+				sent = np.concatenate((sent,encode(seq[w],gpu=False)),axis=0)
+				tar = np.concatenate((tar,encode(seq[w+1],gpu=False)),axis=0)
+			ds.append([cuda.to_device(sent),cuda.to_device(tar)])
+			'''if count % batch_size == 0
+				ds.append(sent)
+				count = 0'''
+
 	print('Dataset is Ready')
 	return ds
 
-def encode(word):
+def encode(word,gpu=True):
 	if isinstance(word,basestring):
 		x = np.zeros((1,word_idx),dtype='float32')
 		x[0][vocab[word]] = 1.
-		return cuda.to_device(x)
+		if gpu == True:
+			return cuda.to_device(x)
+		else:
+			return x
 	else:
 		return word
 	
@@ -237,7 +281,7 @@ def ifog_split(a,arr):
 
 def fp(x,W,b,r):
    	mmprod(x,W,r)
-   	mmadd(r,b,r)
+   	madd_col_vec(r,b,r)
 
 #BP
 
@@ -276,6 +320,18 @@ def mmadd(a,b,c):
 
 def mmsubtract(a,b,c):
 	blas.geam('N','N',a.shape[0],a.shape[1],1.0,a,-1.0,b,c)
+
+@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:])')
+def d_madd_col_vec(a,b,c):
+    x,y = cuda.grid(2)
+    if (x<a.shape[0]) and (y<a.shape[1]):
+    	c[x,y] = a[x,y] + b[0,y]
+    	
+def madd_col_vec(a,b,c):
+	blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))
+	gridDim = ((((a.shape[0] + blockDim[0]) - 1) / blockDim[0]), (((a.shape[1] + blockDim[1]) - 1) / blockDim[1]))
+
+	d_madd_col_vec[gridDim,blockDim](a,b,c)
 
 #SUM
 
@@ -445,10 +501,10 @@ def mcopy(a):
 def d_mclip(a):
     x,y = cuda.grid(2)
     if (x < a.shape[0]) and (y <a.shape[1]):
-        if (a[x,y] > 15.):
-        	a[x,y] = 15.
-        if (a[x,y] < -15.):
-        	a[x,y] = -15.
+        if (a[x,y] > 1.):
+        	a[x,y] = 1.
+        if (a[x,y] < -1.):
+        	a[x,y] = -1.
 
 def mclip(a):
     blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))

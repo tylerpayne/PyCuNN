@@ -83,7 +83,7 @@ class lstm(object):
 		self.updates_tm1 = [mcopy(self.gw2),mcopy(self.gb2)]
 		self.forget()
 
-	def train(self,ds,epochs,batch_size=1,lr=0.03,decay=0.95):
+	def train(self,ds,epochs,batch_size=1,lr=0.5,decay=0.95):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr
 		self.last_best_acc = 0
@@ -221,11 +221,12 @@ class lstm_layer(object):
 		mmmult(f,self.prev_states[-1],self.temp)
 		mmadd(self.states,self.temp,self.states)
 
+		self.prev_states.append(mcopy(self.states))
+
 		mtanh(self.states,self.output)
 		mmmult(self.output,o,self.output)
 
 		self.prev_outputs.append(mcopy(self.output))
-		self.prev_states.append(mcopy(self.states))
 		self.prev_fgates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 		
 		self.inputs.append(mcopy(x))
