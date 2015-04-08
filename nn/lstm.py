@@ -125,7 +125,7 @@ class lstm(object):
 				self.last_best_model = [asarray(self.w2),asarray(self.b2)]
 				self.last_best_model.append(asarray(self.hidden_layer.i_IFOG))
 				self.last_best_model.append(asarray(self.hidden_layer.hm1_IFOG))
-				self.lr = self.lr*decay
+				#self.lr = self.lr*decay
 			time = timer() - start
 			sent = [decode(ds[10][0])]
 			for i in range(15):
@@ -215,7 +215,7 @@ class lstm_layer(object):
 
 		ifog_activate([i,f,o,g])
 
-		#print(asarray(self.gates[3]))
+		self.prev_fgates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 		
 		mmmult(i,g,self.states)
 		mmmult(f,self.prev_states[-1],self.temp)
@@ -227,7 +227,6 @@ class lstm_layer(object):
 		mmmult(self.output,o,self.output)
 
 		self.prev_outputs.append(mcopy(self.output))
-		self.prev_fgates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 		
 		self.inputs.append(mcopy(x))
 		#print(self.output.asarray())

@@ -59,7 +59,7 @@ def load_words_data(fname,gpu=False):
 			vocab[words[i]] = word_idx
 			inv_vocab.append(words[i])
 			word_idx += 1
-		ds.append(words[i])
+			ds.append(words[i])
 	print('Dataset is Ready')
 	return ds
 
@@ -501,10 +501,10 @@ def mcopy(a):
 def d_mclip(a):
     x,y = cuda.grid(2)
     if (x < a.shape[0]) and (y <a.shape[1]):
-        if (a[x,y] > 1.):
-        	a[x,y] = 1.
-        if (a[x,y] < -1.):
-        	a[x,y] = -1.
+        if (a[x,y] > 0.9):
+        	a[x,y] = 0.9
+        if (a[x,y] < -0.9):
+        	a[x,y] = -0.9
 
 def mclip(a):
     blockDim = (min(30,a.shape[0]),min(30,a.shape[1]))

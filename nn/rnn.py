@@ -52,21 +52,17 @@ class rnn(object):
 	def bptt(self,t):
 		for q in range(len(t)-2):
 			mmsubtract(self.outputs[-1],t[-1],self.gOutput)
+			print('gOuptut',np.sum(asarray(self.gOutput),axis=1))
 			bp(self.gOutput,self.w2,self.gw2,self.gb2,self.hs[-1],self.delta)
-			
-			mclip(self.delta)
+
+			mmadd(self.delta,self.gRecurrent,self.delta)
 			mtanh_deriv(self.delta,self.hs[-1],self.delta)
 			mclip(self.delta)
+			bp(self.delta,self.wr,self.gwr,self.gbr,self.hs[-2],self.gRecurrent)
+			mclip(self.gRecurrent)
 
 			bp(self.delta,self.w1,self.gw1,self.gb1,self.inputs[-1],self.gInput)
 			#print(np.argmax(asarray(self.inputs[-1])))
-			bp(self.delta,self.wr,self.gwr,self.gbr,self.hs[-2],self.gRecurrent)
-			mclip(self.gbr)
-			mclip(self.gwr)
-			mclip(self.gw1)
-			mclip(self.gb1)
-			mclip(self.gw2)
-			mclip(self.gb2)
 
 			self.hs.pop()
 			self.inputs.pop()
@@ -76,14 +72,12 @@ class rnn(object):
 		#print(self.gwr.asarray())
 
 	def updateWeights(self):
-		#print(asarray(self.gwr))
 		update_weights(self.w2,self.gw2,self.lr)
 		update_weights(self.b2,self.gb2,self.lr)
 		update_weights(self.w1,self.gw1,self.lr)
 		update_weights(self.b1,self.gb1,self.lr)
 		update_weights(self.wr,self.gwr,self.lr)
 		update_weights(self.br,self.gbr,self.lr)
-		#print(asarray(self.w1))
 		self.forget()
 
 	def train(self,ds,epochs,lr=0.01,decay=0.99):
@@ -113,8 +107,7 @@ class rnn(object):
 				#print(targets)
 				acc = float(correct)/float(count)
 				self.bptt(targets)
-				
-				#print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
+				print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
 				#print('gw2',self.gw2.asarray(),'gb2',self.gb2.asarray(),'iifog',cm.sum(self.hidden_layer.gi_IFOG,axis=1).sum(axis=0).asarray(),'hifog',self.hidden_layer.hm1_IFOG.asarray())
 				self.updateWeights()
 				time += timer()-st
@@ -152,6 +145,9 @@ class rnn(object):
 		self.outputs = []
 		mzero(self.h)
 		mzero(self.r)
+		mzero(self.delta)
+		mzero(self.gRecurrent)
+		mzero(self.gInput)
 		self.hs = [zeros([1,self.layers[1]])]
 		self.inputs=[]
 

@@ -3,6 +3,7 @@ import utils
 from utils import *
 from numbapro import cuda
 from timeit import default_timer as timer
+from scipy.spatial.distance import euclidean as euc
 
 class nn(object):
 	def __init__(self, layers):
@@ -57,10 +58,10 @@ class nn(object):
 		mtanh_deriv(self.delta,self.h,self.delta)
 		bp(self.delta,self.w1,self.gw1,self.gb1,self.input,self.gInput)
 
-		update_weights(self.w1,self.gw1,0.01)
-		update_weights(self.b1,self.gb1,0.01)
-		update_weights(self.w2,self.gw2,0.01)
-		update_weights(self.b2,self.gb2,0.01)
+		update_weights(self.w1,self.gw1,0.05)
+		update_weights(self.b1,self.gb1,0.05)
+		update_weights(self.w2,self.gw2,0.05)
+		update_weights(self.b2,self.gb2,0.05)
 
 		#g = np.zeros(self.w1.shape,dtype='float32')
 		#self.w1.copy_to_host(g)
@@ -70,68 +71,50 @@ class nn(object):
 
 		for epoch in range(epochs):
 			start = timer()
-			for i in range(len(ds)):
-				x = ds[i][0]
-				t = ds[i][1]
+			count = 0.
+			correct = 0.
+			for i in range(len(ds)-1):
+				count += 1.
+				x = encode(ds[i])
+				t = encode(ds[i+1])
 				assert x.shape[1] == self.layers[0]
 				assert t.shape[1] == self.layers[2]
-				#f = np.array([[0,0]],dtype='float32')
-				self.forward(x)#.copy_to_host(f)
-				#print('target',ds[i][1],'output',f)
+				self.forward(x)
+				#print('output',decode(self.output))
+				if decode(self.output) == ds[i+1]:
+					correct += 1.
 				self.backward(t)
-			print("Epoch",epoch,"Time Per Example",(timer()-start)/float(len(ds)))
+			print("Epoch",epoch,"Time:",timer()-start,'output',decode(self.output), 'Accuracy:',correct/count)
+			if correct/count > 0.99:
+				break
 
-a = [cuda.to_device(np.array([[-1,-1]],dtype='float32')),cuda.to_device(np.array([[1,-1]],dtype='float32'))]
-b = [cuda.to_device(np.array([[-1,1]],dtype='float32')),cuda.to_device(np.array([[-1,1]],dtype='float32'))]
-c = [cuda.to_device(np.array([[1,-1]],dtype='float32')),cuda.to_device(np.array([[-1,1]],dtype='float32'))]
-d = [cuda.to_device(np.array([[1,1]],dtype='float32')),cuda.to_device(np.array([[1,-1]],dtype='float32'))]
+ds = load_words_data('../data/ptb.train.txt')
 
-ds = []
-for _ in range(100):
-	ds.append(a)
-	ds.append(b)
-	ds.append(c)
-	ds.append(d)
+net = nn([utils.word_idx,1000,utils.word_idx])
 
-net = nn([2,400,2])
+net.train(ds,10)
 
-net.train(ds,25)
+lookup = []
+vectors = []
+for x in range(utils.word_idx):
+	word = utils.inv_vocab[x]
+	net.forward(encode(word))
+	vectors.append(asarray(net.h)[0])
+	lookup.append(word)
 
-x = cuda.to_device(ds[0][0])
-
-f = np.array([[0,0]],dtype='float32')
-
-
-net.forward(x).copy_to_host(f)
-print(f)
-
-x = cuda.to_device(ds[1][0])
-
-f = np.array([[0,0]],dtype='float32')
-
-
-net.forward(x).copy_to_host(f)
-print(f)
+for z in range(10):
+	dist = 1000
+	idx = 0
+	w = vectors[25+z]
+	for x in range(utils.word_idx):
+		if x is not 25+z:
+			if euc(w,vectors[x]) < dist:
+				print('New Best:', lookup[x])
+				dist = euc(w,vectors[x])
+				idx = x
+	print('Closest to',lookup[25+z],'is',lookup[idx])
 
 
-x = cuda.to_device(ds[2][0])
-
-f = np.array([[0,0]],dtype='float32')
-
-
-net.forward(x).copy_to_host(f)
-print(f)
-
-x = cuda.to_device(ds[3][0])
-
-f = np.array([[0,0]],dtype='float32')
-
-
-net.forward(x).copy_to_host(f)
-print(f)
-
-
-			
 
 
 

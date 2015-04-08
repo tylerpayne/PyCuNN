@@ -99,6 +99,8 @@ class rnn(object):
 				self.bptt(target)
 				self.updateWeights()
 
+				
+
 
 
 
