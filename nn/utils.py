@@ -9,7 +9,6 @@ import pickle
 blas = cublas.Blas()
 gc.collect()
 
-global using_embeddings
 
 def init_weights(n,gpu=True):
 	w=None
@@ -68,6 +67,7 @@ def load_words_data(fname,gpu=False):
 
 def load_sentences_data(fname,gpu=False,batch_size=1,use_embeddings=True):
 	print('Building Dataset')
+	global using_embeddings
 	using_embeddings = use_embeddings
 	global vocab
 	vocab = {}
