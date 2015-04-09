@@ -91,12 +91,10 @@ class lstm(object):
 	def train(self,ds,epochs,batch_size=1,lr=0.01,decay=0.95):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr
-		self.last_best_acc = 0
 		acc = 0
 		w = 0
 		time = 0.
 		wps = 0.
-		self.last_best_model = []
 		for epoch in range(epochs):
 			start = timer()
 			correct = 0
@@ -109,36 +107,36 @@ class lstm(object):
 					count += 1
 					w += 1
 					inval = encode(x[t])
+					#print('inval',asarray(inval))
 					tarval = encode(x[t+1])
+					#print('tarval',asarray(tarval))
 					self.forward(inval)
-					targets.append(tarval)
-					if utils.vocab[decode(x[t+1])] == asarray(self.outputs[-1]).argmax(axis=1):
+					#print('output',asarray(self.output))
+					targets.append(mcopy(tarval))
+					if most_similar(self.outputs[-1]) == x[t+1]:
+						#print('correct')
 						correct += 1
 				#print(targets)
+				acc = float(correct)/float(count)
 				self.bptt(targets)
-				if seq % batch_size == 0:
-					#print('Outputs:',utils.decode(self.outputs[-2]),utils.decode(self.outputs[-1]),'Input',x[-2],'Target',utils.decode(targets[-1]))
-					self.updateWeights()
-					time += timer()-st
-					wps = float(w)/time
-					#print('ETA',(float(utils.total)/wps)/60.,'min')
+				#print('output',asarray(self.outputs[-1]))
+				#print(asarray(self.outputs[-1]))
+				#print('Outputs:',decode(self.outputs[-2]),decode(self.outputs[-1]),'Input',x[-2],'Target',decode(x[-1]))
+				#print('gw2',self.gw2.asarray(),'gb2',self.gb2.asarray(),'iifog',cm.sum(self.hidden_layer.gi_IFOG,axis=1).sum(axis=0).asarray(),'hifog',self.hidden_layer.hm1_IFOG.asarray())
+				self.updateWeights()
+				time += timer()-st
+				wps = float(w)/time
+				#print('wps:',wps,"eta:",(float(utils.total)/wps)/60,'min')
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
-			acc = float(correct)/float(count)
-			if acc > self.last_best_acc:
-				self.last_best_acc = acc
-				self.last_best_model = [asarray(self.w2),asarray(self.b2)]
-				self.last_best_model.append(asarray(self.hidden_layer.i_IFOG))
-				self.last_best_model.append(asarray(self.hidden_layer.hm1_IFOG))
-				#self.lr = self.lr*decay
 			time = timer() - start
-			sent = [decode(ds[10][0])]
+			sent = [ds[10][0]]
 			for i in range(15):
 				x = encode(sent[-1])
 				y = self.forward(x)
-				sent.append(decode(y))
+				sent.append(most_similar(y))
 			self.forget()
-			print('Trained Epoch:',epoch+1,"With Accuracy:",acc, 'in', time, 'seconds', 'Learning Rate:',self.lr)
+			print('Trained Epoch:',epoch+1,"With Accuracy:",acc, 'in', time, 'seconds', 'Learning Rate:',self.lr, 'wps',wps)
 			print('Generated Sentence:',sent)
 
 
@@ -367,12 +365,10 @@ net.train(ds,100)
 time  = timer() - start
 print('Training Time:',time)
 
-net.last_best()
-
 net.forget()
 
 
-sent = [decode(ds[10][0])]
+sent = [decode(ds[11][0])]
 for i in range(15):
 	x = encode(sent[-1])
 	y = self.forward(x)

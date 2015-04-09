@@ -91,11 +91,17 @@ def load_sentences_data(fname,gpu=False,batch_size=1,use_embeddings=True):
 		total = len(lookup)
 		word_idx = vectors[0].shape[1]
 		global d_vectors
-		vocab[lookup[0]] = vectors[0]
+		if gpu == True:
+			vocab[lookup[0]] = cuda.to_device(vectors[0])
+		else:
+			vocab[lookup[0]] = vectors[0]
 		inv_vocab.append(lookup[0])
 		d_vectors = vectors[0]
 		for i in range(1,len(lookup)):
-			vocab[lookup[i]] = vectors[i]
+			if gpu == True:
+				vocab[lookup[i]] = cuda.to_device(vectors[i])
+			else:
+				vocab[lookup[i]] = vectors[i]
 			inv_vocab.append(lookup[i])
 			d_vectors = np.concatenate((d_vectors,vectors[i]),axis=0)
 		d_vectors = cuda.to_device(d_vectors)
