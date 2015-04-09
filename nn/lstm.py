@@ -60,8 +60,13 @@ class lstm(object):
 		for _ in range(len(t)-1,-1,-1):	
 			#print('Delta',self.delta.asarray())
 			mzero(self.gOutput)
-			mmsubtract(self.outputs[_+1],t[_],self.gOutput)
-			accum_bp(self.gOutput,self.gw2,self.gb2,self.hidden_layer.prev_outputs[_+1])
+			if self.softmax:
+				mmsubtract(self.outputs[_+1],t[_],self.gOutput)
+			else:
+				mmsubtract(t[_],self.outputs[_+1],self.gOutput)
+				msmult(self.gOutput,-1.,self.gOutput)
+			
+			bp(self.gOutput,self.gw2,self.gb2,self.hidden_layer.prev_outputs[_+1])
 			mmprod(self.gOutput,self.w2,self.delta,transb='T')
 			self.hidden_layer.backward(self.delta,_+1)
 
