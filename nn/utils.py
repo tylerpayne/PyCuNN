@@ -10,7 +10,6 @@ blas = cublas.Blas()
 gc.collect()
 
 global using_embeddings
-using_embeddings = False
 
 def init_weights(n,gpu=True):
 	w=None

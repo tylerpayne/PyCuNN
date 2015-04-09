@@ -130,7 +130,7 @@ class lstm(object):
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
 			time = timer() - start
-			sent = [ds[10][0]]
+			sent = [ds[11][0]]
 			for i in range(15):
 				x = encode(sent[-1])
 				y = self.forward(x)
