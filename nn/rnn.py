@@ -57,17 +57,13 @@ class rnn(object):
 			assert t[-1].shape[1] == self.layers[2] 
 			mmsubtract(t[-1],self.outputs[-1],self.gOutput)
 			msmult(self.gOutput,-1.,self.gOutput)
-			#mmsubtract(self.outputs[-1],t[-1],self.gOutput)
-			#print('gOuptut',np.sum(asarray(self.gOutput),axis=1))
+
 			bp(self.gOutput,self.w2,self.gw2,self.gb2,self.hs[-1],self.delta)
 
 			mmadd(self.delta,self.gRecurrent,self.delta)
-			#print('delta2',asarray(self.delta))
+			
 			mtanh_deriv(self.delta,self.hs[-1],self.delta)
-			#print('delta2',asarray(self.delta))
-			#mclip(self.delta)
-			#print(asarray(self.delta))
-			#print(asarray(self.hs[-2]))
+
 			bp(self.delta,self.wr,self.gwr,self.gbr,self.hs[-2],self.gRecurrent)
 
 			bp(self.delta,self.w1,self.gw1,self.gb1,self.inputs[-1],self.gInput)
@@ -82,9 +78,7 @@ class rnn(object):
 		mclip(self.gwr)
 		mclip(self.gw2)
 		mclip(self.gw1)
-		#print('gw2',asarray(self.gw2))
-		#print('gwr',asarray(self.gwr))
-		#print('gw1',asarray(self.gw1))
+
 		update_weights(self.w2,self.gw2,self.lr)
 		update_weights(self.b2,self.gb2,self.lr)
 		update_weights(self.w1,self.gw1,self.lr)
