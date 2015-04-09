@@ -95,7 +95,7 @@ class rnn(object):
 		#print(asarray(self.wr))
 		self.forget()
 
-	def train(self,ds,epochs,lr=0.05,decay=0.99):
+	def train(self,ds,epochs,lr=0.001,decay=0.99):
 		#assert ds_x.shape[0] is ds_t.shape[0], "Size Mismatch: Ensure number of examples in input and target datasets is equal"
 		self.lr = lr
 		acc = 0
