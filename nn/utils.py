@@ -4,6 +4,7 @@ import numpy as np
 from timeit import default_timer as timer
 import math
 import gc
+import pickle
 
 blas = cublas.Blas()
 gc.collect()
@@ -63,8 +64,10 @@ def load_words_data(fname,gpu=False):
 	print('Dataset is Ready')
 	return ds
 
-def load_sentences_data(fname,gpu=False,batch_size=1):
+def load_sentences_data(fname,gpu=False,batch_size=1,use_embeddings=True):
 	print('Building Dataset')
+	global using_embeddings
+	using_embeddings = use_embeddings
 	global vocab
 	vocab = {}
 	global inv_vocab
@@ -72,67 +75,105 @@ def load_sentences_data(fname,gpu=False,batch_size=1):
 	global word_idx
 	word_idx = 0
 	global total
+	ds = []
 	with open(fname,'r+') as doc:
 		f = doc.read()
 		sentences = f.split('\n')
 		del sentences[-1]
 		words = f.split(' ')
 		total = len(words)
+	if use_embeddings:
+		global vectors
+		lookup = pickle.load(open('lookup.pickle','r'))
+		vectors = pickle.load(open('vectors.pickle','r'))
+		total = len(lookup)
+		word_idx = vectors[0].shape[1]
+		global d_vectors
+		vocab[lookup[0]] = vectors[0]
+		inv_vocab.append(lookup[0])
+		d_vectors = vectors[0]
+		for i in range(1,len(lookup)):
+			vocab[lookup[i]] = vectors[i]
+			inv_vocab.append(lookup[i])
+			d_vectors = np.concatenate((d_vectors,vectors[i]),axis=0)
+		d_vectors = cuda.to_device(d_vectors)
 
-	for i in range(len(words)-1):
-		if words[i] not in vocab:
-			vocab[words[i]] = word_idx
-			inv_vocab.append(words[i])
-			word_idx += 1
-	ds = []
-	if batch_size == 1:
 		for seq in sentences:
-			seq = seq.split(' ')
-			del seq[0]
-			del seq[-1]
-			sent = []
-			for w in seq:
-				if gpu == True:
-					w = encode(w)
-				sent.append(w)
-			ds.append(sent)
-	else:
-		count = 0
-		for seq in sentences:
-			seq = seq.split(' ')
-			del seq[0]
-			del seq[-1]
-			sent = encode(seq[0],gpu=False)
-			tar = encode(seq[1],gpu=False)
-			for w in xrange(1,len(seq)-1):
-				sent = np.concatenate((sent,encode(seq[w],gpu=False)),axis=0)
-				tar = np.concatenate((tar,encode(seq[w+1],gpu=False)),axis=0)
-			ds.append([cuda.to_device(sent),cuda.to_device(tar)])
-			'''if count % batch_size == 0
+				seq = seq.split(' ')
+				del seq[0]
+				del seq[-1]
+				sent = []
+				for w in seq:
+					if gpu == True:
+						w = cuda.to_device(vocab[w])
+					sent.append(w)
 				ds.append(sent)
-				count = 0'''
+	else:
+		with open(fname,'r+') as doc:
+			f = doc.read()
+			sentences = f.split('\n')
+			del sentences[-1]
+			words = f.split(' ')
+			total = len(words)
+
+		for i in range(len(words)-1):
+			if words[i] not in vocab:
+				vocab[words[i]] = word_idx
+				inv_vocab.append(words[i])
+				word_idx += 1
+
+		if batch_size == 1:
+			for seq in sentences:
+				seq = seq.split(' ')
+				del seq[0]
+				del seq[-1]
+				sent = []
+				for w in seq:
+					if gpu == True:
+						w = encode(w)
+					sent.append(w)
+				ds.append(sent)
+		else:
+			count = 0
+			for seq in sentences:
+				seq = seq.split(' ')
+				del seq[0]
+				del seq[-1]
+				sent = encode(seq[0],gpu=False)
+				tar = encode(seq[1],gpu=False)
+				for w in xrange(1,len(seq)-1):
+					sent = np.concatenate((sent,encode(seq[w],gpu=False)),axis=0)
+					tar = np.concatenate((tar,encode(seq[w+1],gpu=False)),axis=0)
+				ds.append([cuda.to_device(sent),cuda.to_device(tar)])
+				'''if count % batch_size == 0
+					ds.append(sent)
+					count = 0'''
 
 	print('Dataset is Ready')
 	return ds
 
 def encode(word,gpu=True):
 	if isinstance(word,basestring):
-		x = np.zeros((1,word_idx),dtype='float32')
-		x[0][vocab[word]] = 1.
-		if gpu == True:
-			return cuda.to_device(x)
+		if using_embeddings == True:
+			return cuda.to_device(vocab[word])
 		else:
-			return x
+			x = np.zeros((1,word_idx),dtype='float32')
+			x[0][vocab[word]] = 1.
+			if gpu == True:
+				return cuda.to_device(x)
+			else:
+				return x
 	else:
 		return word
 	
 
 def decode(arr):
 	if not isinstance(arr,basestring):
-		a = np.zeros((arr.shape),dtype='float32')
-		arr.copy_to_host(a)
-		index = a.argmax(axis=1)
-		return inv_vocab[index]
+		if using_embeddings == True:
+			return most_similar(arr)
+		else:
+			_,index = margmax(arr)
+			return inv_vocab[index]
 	else:
 		return arr
 	
@@ -527,66 +568,152 @@ def update_weights(w,gw,lr):
 
 	d_update_weights[gridDim,blockDim](w,gw,lr)
 
+#MOST SIMILAR
+
+@cuda.jit('float32(float32,float32)',device=True)
+def d_dist(a,b):
+    return math.pow((b-a),2)
+
+@cuda.jit('void(float32[:,:],float32[:,:],float32[:,:])')
+def d_distances(a,b,val):
+    x = cuda.grid(1)
+    if (x < b.shape[0]):
+		dist = 0.
+		for y in range(b.shape[1]):
+			dist += d_dist(a[0,y],b[x,y])
+		dist = math.sqrt(dist)
+		val[0,x] = dist
+
+
+def most_similar(a):
+	assert a.shape[1] == d_vectors.shape[1], "Size Mismatch: (%i,%i), (%i,%i)" %(a.shape[0],a.shape[1],d_vectors.shape[0],d_vectors.shape[1])
+	blockDim = (1024)
+	gridDim = (((d_vectors.shape[0] + blockDim) - 1) / blockDim)
+
+	val = cuda.device_array((1,d_vectors.shape[0]),dtype='float32')
+
+	d_distances[gridDim,blockDim](a,d_vectors,val)
+
+	_,idx = margmin(val)
+
+	return inv_vocab[idx]
+
+#ARGMIN
+
+@cuda.jit('void(float32[:,:],float32[:,:],int32[:,:])')
+def d_margmin(a,val,idx):
+    x = cuda.grid(1)
+    tidx = cuda.threadIdx.x
+    bidx = cuda.blockIdx.x
+    total = min(cuda.blockDim.x, a.shape[1] - (cuda.blockIdx.x*cuda.blockDim.x))
+    if (x < a.shape[1]):
+		sVal = cuda.shared.array((1024),dtype=float32)
+		sIdx = cuda.shared.array((1024),dtype=float32)
+		s = total/2
+		if x+s < total:
+			if a[0,x] < a[0,x+s]:
+				sVal[tidx] = a[0,x]
+				sIdx[tidx] = x
+			else:
+				sVal[tidx] = a[0,x+s]
+				sIdx[tidx] = x+s
+			cuda.syncthreads()
+			if total%2 == 1:
+				if tidx == total-1:
+					if a[0,x] < a[0,x-tidx]:
+						sVal[0] = a[0,x]
+						sIdx[0] = x
+		s = s/2
+		cuda.syncthreads()
+		while s > 0:
+			if tidx+s < total:
+				if sVal[tidx] > sVal[tidx+s]:
+					sVal[tidx] = sVal[tidx+s]
+					sIdx[tidx] = sIdx[tidx+s]
+				cuda.syncthreads()
+				if s%2 == 1 and s > 1:
+					if tidx == s-1:
+						if sVal[0] > sVal[tidx]:
+							sVal[0] = sVal[tidx]
+							sIdx[0] = sIdx[tidx]
+				cuda.syncthreads()
+			s = s/2
+		cuda.syncthreads()
+		if tidx == 0:
+			val[0,bidx] = sVal[tidx]
+			idx[0,bidx] = sIdx[tidx]	
+
+def margmin(a):
+	blockDim = min(1024,a.shape[1])
+	gridDim = (((a.shape[1]) + blockDim) - 1) / blockDim
+	val = cuda.device_array_like(a)
+	idx = cuda.device_array(a.shape,dtype='int32')
+	d_margmin[gridDim,blockDim](a,val,idx)
+	while gridDim > 1:
+		last_gridDim = gridDim
+		blockDim = gridDim
+		gridDim = ((last_gridDim + blockDim) - 1) / blockDim
+		d_msum[gridDim,blockDim](val,val,idx)
+	return val[0,0],idx[0,0]
+
 #ARGMAX
 
-@cuda.jit('void(float32[:,:],int32[:,:],int32[:])')
-def d_margmax(a,amax,aidx):
-	sA = cuda.shared.array(shape=(1024),dtype=float32)
-	sIdx = cuda.shared.array(shape=(1024),dtype=float32)
-	idx = cuda.threadIdx.x
-	gidx = cuda.grid(1)
-	total = min(cuda.blockDim.x,a.shape[1] - (cuda.blockIdx.x*cuda.blockDim.x))
-	s = total/2
-	if gidx+s < a.shape[1]:
-		if a[0,gidx] > a[0,gidx+s]:
-			sA[idx] = a[0,gidx]
-			sIdx[idx] = gidx
-		else:
-			sA[idx] = a[0,gidx+s]
-			sIdx[idx] = gidx+s
-		cuda.syncthreads()
-		if total%2 == 1:
-				if idx == total-1:
-					if a[0,gidx] > a[0,gidx-idx]:
-						sA[0] = a[0,gidx]
-						sIdx[0] = gidx
+@cuda.jit('void(float32[:,:],float32[:,:],int32[:,:])')
+def d_margmax(a,val,idx):
+    x = cuda.grid(1)
+    tidx = cuda.threadIdx.x
+    bidx = cuda.blockIdx.x
+    total = min(cuda.blockDim.x, a.shape[1] - (cuda.blockIdx.x*cuda.blockDim.x))
+    if (x < a.shape[1]):
+		sVal = cuda.shared.array((1024),dtype=float32)
+		sIdx = cuda.shared.array((1024),dtype=float32)
+		s = total/2
+		if x+s < total:
+			if a[0,x] > a[0,x+s]:
+				sVal[tidx] = a[0,x]
+				sIdx[tidx] = x
+			else:
+				sVal[tidx] = a[0,x+s]
+				sIdx[tidx] = x+s
+			cuda.syncthreads()
+			if total%2 == 1:
+				if tidx == total-1:
+					if a[0,x] > a[0,x-tidx]:
+						sVal[0] = a[0,x]
+						sIdx[0] = x
 		s = s/2
+		cuda.syncthreads()
 		while s > 0:
-			if idx < s:
-				if a[0,gidx] > a[0,gidx+s]:
-					sA[idx] = a[0,gidx]
-					sIdx[idx] = gidx
-				else:
-					sA[idx] = a[0,gidx+s]
-					sIdx[idx] = gidx+s
-			cuda.syncthreads()
-			if s%2 == 1 and s > 1:
-				if idx == s-1:
-					if a[0,gidx] > a[0,gidx-idx]:
-						sA[0] = a[0,gidx]
-						sIdx[0] = gidx
-			cuda.syncthreads()
+			if tidx+s < total:
+				if sVal[tidx] < sVal[tidx+s]:
+					sVal[tidx] = sVal[tidx+s]
+					sIdx[tidx] = sIdx[tidx+s]
+				cuda.syncthreads()
+				if s%2 == 1 and s > 1:
+					if tidx == s-1:
+						if sVal[0] < sVal[tidx]:
+							sVal[0] = sVal[tidx]
+							sIdx[0] = sIdx[tidx]
+				cuda.syncthreads()
 			s = s/2
-		if idx == 0:
-			amax[0,cuda.blockIdx.x] = sA[0]
-			aidx[0] = sIdx[0]
+		cuda.syncthreads()
+		if tidx == 0:
+			val[0,bidx] = sVal[tidx]
+			idx[0,bidx] = sIdx[tidx]	
 
 def margmax(a):
 	blockDim = min(1024,a.shape[1])
 	gridDim = (((a.shape[1]) + blockDim) - 1) / blockDim
-	amax = cuda.device_array((1,gridDim),dtype='float32')
-	aidx = cuda.device_array((gridDim),dtype='int32')
-	d_margmax[gridDim,blockDim](a,amax,aidx)
+	val = cuda.device_array_like(a)
+	idx = cuda.device_array(a.shape,dtype='int32')
+	d_margmax[gridDim,blockDim](a,val,idx)
 	while gridDim > 1:
-		print(amax[2])
 		last_gridDim = gridDim
 		blockDim = gridDim
 		gridDim = ((last_gridDim + blockDim) - 1) / blockDim
-		bmax = cuda.device_array((1,gridDim),dtype='float32')
-		bidx = cuda.device_array((gridDim),dtype='int32')
-		d_margmax[gridDim,blockDim](amax,bmax,bidx)
-	return aidx
+		d_msum[gridDim,blockDim](val,val,idx)
+	return val[0,0],idx[0,0]
 
-
+			
 
 
