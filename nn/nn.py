@@ -91,7 +91,7 @@ class nn(object):
 
 ds = load_words_data('../data/ptb.train.txt',gpu=True)
 
-net = nn([utils.word_idx,1000,utils.word_idx])
+net = nn([utils.word_idx,1500,utils.word_idx])
 
 net.train(ds,100)
 
