@@ -81,7 +81,7 @@ class nn(object):
 				assert x.shape[1] == self.layers[0]
 				assert t.shape[1] == self.layers[2]
 				self.forward(x)
-				#print('output',decode(self.output))
+				print('output',decode(self.output))
 				if decode(self.output) == ds[i+1]:
 					correct += 1.
 				self.backward(t)
