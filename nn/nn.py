@@ -42,7 +42,7 @@ class nn(object):
 		fp(x,self.w1,self.b1,self.h)
 		mtanh(self.h,self.h)
 		fp(self.h,self.w2,self.b2,self.y)
-		mtanh(self.y,self.output)
+		msoftmax(self.y,self.output)
 		return self.output
 
 	def backward(self,t):
