@@ -59,10 +59,10 @@ class nn(object):
 		mtanh_deriv(self.delta,self.h,self.delta)
 		bp(self.delta,self.w1,self.gw1,self.gb1,self.input,self.gInput)
 
-		update_weights(self.w1,self.gw1,0.01)
-		update_weights(self.b1,self.gb1,0.01)
-		update_weights(self.w2,self.gw2,0.01)
-		update_weights(self.b2,self.gb2,0.01)
+		update_weights(self.w1,self.gw1,0.05)
+		update_weights(self.b1,self.gb1,0.05)
+		update_weights(self.w2,self.gw2,0.05)
+		update_weights(self.b2,self.gb2,0.05)
 
 		#g = np.zeros(self.w1.shape,dtype='float32')
 		#self.w1.copy_to_host(g)
