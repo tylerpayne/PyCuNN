@@ -2,6 +2,7 @@ import numpy as np
 from timeit import default_timer as timer
 import utils
 from utils import *
+from PyCuNN import *
 from scipy.spatial.distance import euclidean as euc
 import pickle
 
@@ -173,4 +174,4 @@ ds = load_sentences_data('../data/ptb.train.short.txt',use_embeddings=True)
 
 net = rnn([500,1000,500])
 
-net.train(ds,65)
+net.train(ds,150)

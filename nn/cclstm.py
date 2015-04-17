@@ -1,6 +1,7 @@
 import numpy as np 
 import utils
 from utils import *
+from cuPyNN import *
 import lstm
 import nn
 from timeit import default_timer as timer

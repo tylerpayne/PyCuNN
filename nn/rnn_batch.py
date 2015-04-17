@@ -99,10 +99,6 @@ class rnn(object):
 				self.bptt(target)
 				self.updateWeights()
 
-				
-
-
-
 
 	def reset_grads(self):
 		mzero(self.gw1)

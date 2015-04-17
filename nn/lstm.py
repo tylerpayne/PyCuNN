@@ -6,6 +6,7 @@ import math
 import pickle
 import utils
 from utils import *
+from PyCuNN import *
 import sys
 
 class lstm(object):
@@ -36,7 +37,10 @@ class lstm(object):
 		self.delta = zeros([1,self.layers[1]])
 		self.output = zeros([1,self.layers[2]])
 
-		self.forget()
+		self.outputs = [zeros([1,self.layers[2]])]
+		self.hs = [zeros([1,self.layers[1]])]
+		self.inputs=[zeros([1,self.layers[0]])]
+
 		self.updates_tm1 = [self.gw2,self.gb2]
 
 	def forward(self,x):
@@ -66,8 +70,7 @@ class lstm(object):
 				mmsubtract(t[_],self.outputs[_+1],self.gOutput)
 				msmult(self.gOutput,-1.,self.gOutput)
 			
-			bp(self.gOutput,self.w2,self.gw2,self.gb2,self.hidden_layer.prev_outputs[_+1])
-			mmprod(self.gOutput,self.w2,self.delta,transb='T')
+			bp(self.gOutput,self.w2,self.gw2,self.gb2,self.hidden_layer.prev_outputs[_+1],self.delta)
 			self.hidden_layer.backward(self.delta,_+1)
 
 	def updateWeights(self):
@@ -113,15 +116,15 @@ class lstm(object):
 					self.forward(inval)
 					#print('output',asarray(self.output))
 					targets.append(mcopy(tarval))
-					if most_similar(self.outputs[-1]) == x[t+1]:
+					if most_similar(self.outputs[-1]) == decode(x[t+1]):
 						#print('correct')
 						correct += 1
 				#print(targets)
 				acc = float(correct)/float(count)
 				self.bptt(targets)
-				#print('output',asarray(self.outputs[-1]))
+			#	print('output',asarray(self.outputs[-1]))
 				#print(asarray(self.outputs[-1]))
-				#print('Outputs:',decode(self.outputs[-2]),decode(self.outputs[-1]),'Input',x[-2],'Target',decode(x[-1]))
+			#	print('Outputs:',decode(self.outputs[-2]),decode(self.outputs[-1]),'Input',decode(x[-2]),'Target',decode(x[-1]))
 				#print('gw2',self.gw2.asarray(),'gb2',self.gb2.asarray(),'iifog',cm.sum(self.hidden_layer.gi_IFOG,axis=1).sum(axis=0).asarray(),'hifog',self.hidden_layer.hm1_IFOG.asarray())
 				self.updateWeights()
 				time += timer()-st
@@ -130,7 +133,7 @@ class lstm(object):
 				#if (seq % 100 == 0) and (self.lr > 0.005):
 					#self.lr = self.lr * decay
 			time = timer() - start
-			sent = [ds[11][0]]
+			sent = [decode(ds[11][0])]
 			for i in range(15):
 				x = encode(sent[-1])
 				y = self.forward(x)
@@ -150,10 +153,12 @@ class lstm(object):
 		#print("MAIN RESET")
 		#self.dmasks = [cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.w2.shape)),cm.CUDAMatrix(np.random.binomial(n=1,p=0.8,size=self.b2.shape))]
 		mzero(self.output)
-		self.outputs = [zeros([1,self.layers[-1]])]
-		self.hs = [zeros([1,self.layers[-1]])]
-		self.inputs=[zeros([1,self.layers[0]])]
-		self.hidden_layer.reset_activations()
+		self.outputs = [self.outputs[0]]
+		mzero(self.outputs[0])
+		self.hs = [self.hs[0]]
+		mzero(self.hs[0])
+		self.inputs=[self.inputs[0]]
+		mzero(self.inputs[0])
 
 	def forget(self):
 		self.reset_grads()
@@ -174,19 +179,25 @@ class lstm_layer(object):
 
 		#Input Gate Weights
 
-		self.i_IFOG = init_weights([self.layers[0],self.layers[1]*4])
+		self.IFOG = init_weights([self.layers[0]+self.layers[1],self.layers[1]*4])
 
-		self.hm1_IFOG = init_weights([self.layers[1],self.layers[1]*4])
-
-		self.i_b = init_weights([1,self.layers[1]*4])
-		self.hm1_b = init_weights([1,self.layers[1]*4])
+		self.b = init_weights([1,self.layers[1]*4])
 
 		self.uplim = uplim
 		self.lowlim = lowlim
-		self.updates_tm1 = [zeros([self.layers[0],self.layers[1]*4]),zeros([self.layers[1],self.layers[1]*4])]
+		self.updates_tm1 = zeros([self.layers[0]+self.layers[1],self.layers[1]*4])
 		self.temp = zeros([1,self.layers[1]])
 		self.sum_IFOG = zeros([1,self.layers[1]*4])
 		self.states = zeros([1,self.layers[1]])
+		self.prev_states = [zeros([1,self.layers[1]])]
+
+		self.prev_outputs =[zeros([1,self.layers[1]])]
+		self.prev_gates =[[zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]])]]
+		self.prev_fgates =[[zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]])]]
+		self.prev_ggates = [zeros([1,self.layers[1]*4])]
+		self.inputs = [zeros([1,self.layers[0]])]
+		self.prev_es = [zeros([1,self.layers[1]])]
+
 		self.output = zeros([1,self.layers[1]])
 		self.recurrentGrad = zeros([1,self.layers[1]*4])
 		self.ec = zeros([1,self.layers[1]])
@@ -196,24 +207,20 @@ class lstm_layer(object):
 		self.gf = zeros([1,self.layers[1]])
 		self.gi = zeros([1,self.layers[1]])
 		self.ggates = zeros([1,self.layers[1]*4])
-		self.gi_IFOG = zeros([self.layers[0],self.layers[1]*4])
-		self.ghm1_IFOG = zeros([self.layers[1],self.layers[1]*4])
-		self.gi_b = zeros([1,self.layers[1]*4])
-		self.ghm1_b = zeros([1,self.layers[1]*4])
-
-		self.forget()
+		self.gIFOG = zeros([self.layers[0]+self.layers[1],self.layers[1]*4])
+		self.gb = zeros([1,self.layers[1]*4])
 
 	def forward(self,x):
-		mmprod(x,self.i_IFOG,self.sum_IFOG)
-		mmadd(self.sum_IFOG,self.i_b,self.sum_IFOG)
-		mmprod(self.prev_outputs[-1],self.hm1_IFOG,self.temp)
-		mmadd(self.temp,self.hm1_b,self.temp)
+
+		mmprod(x,self.IFOG[:self.layers[0],:],self.sum_IFOG)
+		mmprod(self.prev_outputs[-1],self.IFOG[self.layers[0]:,:],self.temp)
 		mmadd(self.sum_IFOG,self.temp,self.sum_IFOG)
+		mmadd(self.sum_IFOG,self.b,self.sum_IFOG)
 		i = self.sum_IFOG[:,0:self.layers[1]]
 		f = self.sum_IFOG[:,self.layers[1]:self.layers[1]*2]
 		o = self.sum_IFOG[:,self.layers[1]*2:self.layers[1]*3]
 		g = self.sum_IFOG[:,self.layers[1]*3:self.layers[1]*4]
-		#print(asarray(self.sum_IFOG))
+	
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
 		ifog_activate([i,f,o,g])
@@ -239,7 +246,7 @@ class lstm_layer(object):
 		#print('prev_gc',self.prev_gc[-1].asarray())
 		#print(temp.asarray())
 
-		mmprod(self.prev_ggates[-1],self.hm1_IFOG,self.recurrentGrad,transb='T')
+		mmprod(self.prev_ggates[-1],self.IFOG[self.layers[0]:,:],self.recurrentGrad,transb='T')
 
 		i = self.prev_gates[t][0]
 		f = self.prev_gates[t][1]
@@ -291,38 +298,27 @@ class lstm_layer(object):
 		self.prev_ggates.append(mcopy(self.ggates))
 
 		#Accumulate Gradients
-		accum_bp(self.ggates,self.gi_IFOG,self.gi_b,self.inputs[t])
-		accum_bp(self.ggates,self.ghm1_IFOG,self.ghm1_b,self.prev_outputs[t-1])
+		accum_bp(self.ggates,self.gIFOG[:self.layers[0],:],self.gb,self.inputs[t])
+		accum_bp(self.ggates,self.gIFOG[self.layers[0]:,:],self.gb,self.prev_outputs[t-1])
 
 
 	def updateWeights(self,lr):
 		#self.clip(self.ghm1_IFOG)
+		#print(asarray(self.gIFOG))
+		lr = lr*10
+		mclip(self.gIFOG)
+		mclip(self.gb)
 
-		mclip(self.gi_IFOG)
-		mclip(self.gi_b)
-		mclip(self.ghm1_b)
-		mclip(self.ghm1_IFOG)
+		msmult(self.gb,lr,self.gb)
+		mmsubtract(self.b,self.gb,self.b)
+
+		msmult(self.gIFOG,lr,self.gIFOG)
+		msmult(self.updates_tm1,0.9,self.updates_tm1)
+		mmadd(self.gIFOG,self.updates_tm1,self.gIFOG)
+		mmsubtract(self.IFOG,self.gIFOG,self.IFOG)
 		
-
-		msmult(self.gi_b,lr,self.gi_b)
-		mmsubtract(self.i_b,self.gi_b,self.i_b)
-
-		msmult(self.ghm1_b,lr,self.ghm1_b)
-		mmsubtract(self.hm1_b,self.ghm1_b,self.hm1_b)
-
-		msmult(self.gi_IFOG,lr,self.gi_IFOG)
-		msmult(self.updates_tm1[0],0.9,self.updates_tm1[0])
-		mmadd(self.gi_IFOG,self.updates_tm1[0],self.gi_IFOG)
-		mmsubtract(self.i_IFOG,self.gi_IFOG,self.i_IFOG)
-
-		msmult(self.ghm1_IFOG,lr,self.ghm1_IFOG)
-		msmult(self.updates_tm1[1],0.9,self.updates_tm1[1])
-		mmadd(self.ghm1_IFOG,self.updates_tm1[1],self.ghm1_IFOG)
-		mmsubtract(self.hm1_IFOG,self.ghm1_IFOG,self.hm1_IFOG)
-
-		
-		self.updates_tm1 = [mcopy(self.gi_IFOG),mcopy(self.ghm1_IFOG)]
-		#print(self.i_IFOG.asarray())
+		self.updates_tm1 = mcopy(self.gIFOG)
+		#print(asarray(self.IFOG))
 
 	def forget(self):
 		self.reset_activations()
@@ -330,34 +326,41 @@ class lstm_layer(object):
 
 	def reset_activations(self):
 		#print('RESETTING')
-		self.prev_states = [zeros([1,self.layers[1]])]
-		self.prev_outputs =[zeros([1,self.layers[1]])]
-		self.prev_gates =[[zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]])]]
-		self.prev_fgates =[[zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]])]]
-		self.prev_ggates =[zeros([1,self.layers[1]*4])]
-		self.inputs = [zeros([1,self.layers[0]])]
-		self.updates_tm1 = [zeros([self.layers[0],self.layers[1]*4]),zeros([self.layers[1],self.layers[1]*4])]
+		self.prev_states = [self.prev_states[-1]]
+		mzero(self.prev_states[0])
+		self.prev_outputs =[self.prev_outputs[-1]]
+		mzero(self.prev_outputs[0])
+		self.prev_gates = [self.prev_gates[-1]]
+		for gate in self.prev_gates[0]:
+			mzero(gate)
+		self.prev_fgates = [self.prev_fgates[-1]]
+		for gate in self.prev_fgates[0]:
+			mzero(gate)
+		self.prev_ggates =[self.prev_ggates[-1]]
+		mzero(self.prev_ggates[0])
+		self.inputs = [self.inputs[-1]]
+		mzero(self.inputs[0])
+		mzero(self.updates_tm1)
 
-		self.prev_es = [zeros([1,self.layers[1]])]
+		self.prev_es = [self.prev_es[0]]
+		mzero(self.prev_es[0])
 
 	def reset_grads(self):
 		#print('Resetting Grads')
-		mzero(self.gi_IFOG)
-		mzero(self.ghm1_IFOG)
+		mzero(self.gIFOG)
 		mzero(self.ec)
 		mzero(self.es)
 		mzero(self.go)
 		mzero(self.gg)
 		mzero(self.gf)
 		mzero(self.gi)
-		mzero(self.gi_b)
-		mzero(self.ghm1_b)
+		mzero(self.gb)
 
 
 ds = load_sentences_data('../data/ptb.train.short.txt',gpu=True)
 
 n_tokens = utils.word_idx
-net = lstm([n_tokens,1000,n_tokens])
+net = lstm([n_tokens,1000,n_tokens],softmax=False)
 
 start = timer()
 print('Starting Training')

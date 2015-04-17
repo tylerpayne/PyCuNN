@@ -1,6 +1,7 @@
 import numpy as np 
 import utils
 from utils import *
+from PyCuNN import *
 from numbapro import cuda
 from timeit import default_timer as timer
 from scipy.spatial.distance import euclidean as euc
@@ -59,39 +60,45 @@ class nn(object):
 		mtanh_deriv(self.delta,self.h,self.delta)
 		bp(self.delta,self.w1,self.gw1,self.gb1,self.input,self.gInput)
 
-		update_weights(self.w1,self.gw1,0.05)
-		update_weights(self.b1,self.gb1,0.05)
-		update_weights(self.w2,self.gw2,0.05)
-		update_weights(self.b2,self.gb2,0.05)
+		update_weights(self.w1,self.gw1,0.01)
+		update_weights(self.b1,self.gb1,0.01)
+		update_weights(self.w2,self.gw2,0.01)
+		update_weights(self.b2,self.gb2,0.01)
 
 		#g = np.zeros(self.w1.shape,dtype='float32')
 		#self.w1.copy_to_host(g)
 		#print(g)
 
-	def train(self,ds,epochs,batch_size=1):
+	def train(self,ds,epochs,batch_size=10):
 
 		for epoch in range(epochs):
 			start = timer()
 			count = 0.
 			correct = 0.
-			for i in range(len(ds)-1):
+			for i in range(len(ds)/batch_size):
 				count += 1.
-				x = encode(ds[i])
-				t = encode(ds[i+1])
+				x = encode(ds[i*batch_size][0],gpu=False)
+				t = encode(ds[i*batch_size][1],gpu=False)
+				for b in range(batch_size-1):
+					x = np.concatenate((x,encode(ds[i*batch_size + b+1][0],gpu=False)))
+					t = np.concatenate((t,encode(ds[i*batch_size + b+1][1],gpu=False)))
+				x = cuda.to_device(x)
+				t = cuda.to_device(t)
 				assert x.shape[1] == self.layers[0]
 				assert t.shape[1] == self.layers[2]
+				print(x.shape)
 				self.forward(x)
-				#print('output',decode(self.output))
-				if decode(self.output) == ds[i+1]:
+				print('output',decode(self.output))
+				if decode(self.output) == decode(t):
 					correct += 1.
 				self.backward(t)
 			print("Epoch",epoch,"Time:",timer()-start,'output',decode(self.output), 'Accuracy:',correct/count)
 			if correct/count > 0.99:
 				break
 
-ds = load_words_data('../data/ptb.train.txt',gpu=True)
+ds = load_words_data('../data/ptb.train.short.txt',gpu=True)
 
-net = nn([utils.word_idx,1500,utils.word_idx])
+net = nn([utils.word_idx,500,utils.word_idx])
 
 net.train(ds,100)
 
