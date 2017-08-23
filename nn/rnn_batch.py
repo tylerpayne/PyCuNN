@@ -1,4 +1,4 @@
-import numpy as np 
+import numpy as np
 from timeit import default_timer as timer
 import utils
 from utils import *
@@ -53,7 +53,7 @@ class rnn(object):
 	def bptt(self,t):
 		mmsubtract(self.output,t,self.gOutput)
 		bp(self.gOutput,self.w2,self.gw2,self.gb2,self.h,self.delta)
-			
+
 		mclip(self.delta)
 		mtanh_deriv(self.delta,self.h,self.delta)
 		mclip(self.delta)
@@ -112,7 +112,7 @@ class rnn(object):
 		mzero(self.gRecurrent)
 		mzero(self.delta)
 		self.updates_tm1 = [self.gw2,self.gb2,self.gw1,self.gb1,self.gwr,self.gbr]
-		
+
 
 	def reset_activations(self):
 		mzero(self.output)
@@ -126,8 +126,9 @@ class rnn(object):
 		self.reset_grads()
 		self.reset_activations()
 
-ds = load_words_data('../data/ptb.train.short.txt')
+def test_rnn_batch():
+	ds = load_words_data('../data/ptb.train.short.txt')
 
-net = rnn([utils.word_idx,1000,utils.word_idx])
+	net = rnn([utils.word_idx,1000,utils.word_idx])
 
-net.train(ds,65)
+	net.train(ds,65)

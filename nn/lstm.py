@@ -12,7 +12,7 @@ import sys
 class lstm(object):
 	def __init__(self, layers,uplim=15,lowlim=-15,softmax=True):
 		super(lstm, self).__init__()
-		
+
 		self.layers = layers
 		self.outputs = []
 		self.uplim = uplim
@@ -61,7 +61,7 @@ class lstm(object):
 		self.hidden_layer.prev_gates.append([zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]])])
 		self.hidden_layer.prev_fgates.append([zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]]),zeros([1,self.layers[1]])])
 
-		for _ in range(len(t)-1,-1,-1):	
+		for _ in range(len(t)-1,-1,-1):
 			#print('Delta',self.delta.asarray())
 			mzero(self.gOutput)
 			if self.softmax:
@@ -69,7 +69,7 @@ class lstm(object):
 			else:
 				mmsubtract(t[_],self.outputs[_+1],self.gOutput)
 				msmult(self.gOutput,-1.,self.gOutput)
-			
+
 			bp(self.gOutput,self.w2,self.gw2,self.gb2,self.hidden_layer.prev_outputs[_+1],self.delta)
 			self.hidden_layer.backward(self.delta,_+1)
 
@@ -86,7 +86,7 @@ class lstm(object):
 		msmult(self.updates_tm1[1],0.9,self.updates_tm1[1])
 		mmadd(self.gb2,self.updates_tm1[1],self.gb2)
 		mmsubtract(self.b2,self.gb2,self.b2)
-		
+
 		self.hidden_layer.updateWeights(self.lr)
 		self.updates_tm1 = [mcopy(self.gw2),mcopy(self.gb2)]
 		self.forget()
@@ -170,7 +170,7 @@ class lstm(object):
 		self.b2 = cuda.to_device(self.last_best_model[1])
 		self.hidden_layer.i_IFOG = cuda.to_device(self.last_best_model[2])
 		self.hidden_layer.hm1_IFOG = cuda.to_device(self.last_best_model[3])
-		
+
 class lstm_layer(object):
 	def __init__(self, layers,uplim=1,lowlim=-1):
 		super(lstm_layer, self).__init__()
@@ -220,13 +220,13 @@ class lstm_layer(object):
 		f = self.sum_IFOG[:,self.layers[1]:self.layers[1]*2]
 		o = self.sum_IFOG[:,self.layers[1]*2:self.layers[1]*3]
 		g = self.sum_IFOG[:,self.layers[1]*3:self.layers[1]*4]
-	
+
 		self.prev_gates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
 
 		ifog_activate([i,f,o,g])
 
 		self.prev_fgates.append([mcopy(i),mcopy(f),mcopy(o),mcopy(g)])
-		
+
 		mmmult(i,g,self.states)
 		mmmult(f,self.prev_states[-1],self.temp)
 		mmadd(self.states,self.temp,self.states)
@@ -237,7 +237,7 @@ class lstm_layer(object):
 		mmmult(self.output,o,self.output)
 
 		self.prev_outputs.append(mcopy(self.output))
-		
+
 		self.inputs.append(mcopy(x))
 		#print(self.output.asarray())
 		return self.output
@@ -316,7 +316,7 @@ class lstm_layer(object):
 		msmult(self.updates_tm1,0.9,self.updates_tm1)
 		mmadd(self.gIFOG,self.updates_tm1,self.gIFOG)
 		mmsubtract(self.IFOG,self.gIFOG,self.IFOG)
-		
+
 		self.updates_tm1 = mcopy(self.gIFOG)
 		#print(asarray(self.IFOG))
 
@@ -356,26 +356,24 @@ class lstm_layer(object):
 		mzero(self.gi)
 		mzero(self.gb)
 
+def test_lstm():
+	ds = load_sentences_data('../data/ptb.train.short.txt',gpu=True)
 
-ds = load_sentences_data('../data/ptb.train.short.txt',gpu=True)
+	n_tokens = utils.word_idx
+	net = lstm([n_tokens,1000,n_tokens],softmax=False)
 
-n_tokens = utils.word_idx
-net = lstm([n_tokens,1000,n_tokens],softmax=False)
+	start = timer()
+	print('Starting Training')
+	net.train(ds,100)
+	time  = timer() - start
+	print('Training Time:',time)
 
-start = timer()
-print('Starting Training')
-net.train(ds,100)
-time  = timer() - start
-print('Training Time:',time)
+	net.forget()
 
-net.forget()
+	sent = [decode(ds[11][0])]
+	for i in range(15):
+		x = encode(sent[-1])
+		y = self.forward(x)
+		sent.append(decode(y))
 
-
-sent = [decode(ds[11][0])]
-for i in range(15):
-	x = encode(sent[-1])
-	y = self.forward(x)
-	sent.append(decode(y))
-
-print(sent)
-
+	print(sent)

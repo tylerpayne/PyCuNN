@@ -1,4 +1,4 @@
-import numpy as np 
+import numpy as np
 from timeit import default_timer as timer
 import utils
 from utils import *
@@ -41,7 +41,7 @@ class rnn(object):
 		self.lr = 0.01
 
 	def forward(self,x):
-		assert x.shape[1] == self.layers[0] 
+		assert x.shape[1] == self.layers[0]
 		fp(x,self.w1,self.b1,self.h)
 		fp(self.hs[-1],self.wr,self.br,self.r)
 		mmadd(self.h,self.r,self.h)
@@ -55,14 +55,14 @@ class rnn(object):
 
 	def bptt(self,t):
 		for q in range(len(t)-2):
-			assert t[-1].shape[1] == self.layers[2] 
+			assert t[-1].shape[1] == self.layers[2]
 			mmsubtract(t[-1],self.outputs[-1],self.gOutput)
 			msmult(self.gOutput,-1.,self.gOutput)
 
 			bp(self.gOutput,self.w2,self.gw2,self.gb2,self.hs[-1],self.delta)
 
 			mmadd(self.delta,self.gRecurrent,self.delta)
-			
+
 			mtanh_deriv(self.delta,self.hs[-1],self.delta)
 
 			bp(self.delta,self.wr,self.gwr,self.gbr,self.hs[-2],self.gRecurrent)
@@ -86,7 +86,7 @@ class rnn(object):
 		update_weights(self.b1,self.gb1,self.lr)
 		update_weights(self.wr,self.gwr,self.lr)
 		update_weights(self.br,self.gbr,self.lr)
-		
+
 		#print(asarray(self.wr))
 		self.forget()
 
@@ -153,7 +153,7 @@ class rnn(object):
 		mzero(self.gRecurrent)
 		mzero(self.delta)
 		self.updates_tm1 = [self.gw2,self.gb2,self.gw1,self.gb1,self.gwr,self.gbr]
-		
+
 
 	def reset_activations(self):
 		mzero(self.output)
@@ -170,8 +170,9 @@ class rnn(object):
 		self.reset_grads()
 		self.reset_activations()
 
-ds = load_sentences_data('../data/ptb.train.short.txt',use_embeddings=True)
+def test_rnn():
+	ds = load_sentences_data('../data/ptb.train.short.txt',use_embeddings=True)
 
-net = rnn([500,1000,500])
+	net = rnn([500,1000,500])
 
-net.train(ds,150)
+	net.train(ds,150)

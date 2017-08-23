@@ -1,4 +1,4 @@
-import numpy as np 
+import numpy as np
 import utils
 from utils import *
 from PyCuNN import *
@@ -96,38 +96,31 @@ class nn(object):
 			if correct/count > 0.99:
 				break
 
-ds = load_words_data('../data/ptb.train.short.txt',gpu=True)
-
-net = nn([utils.word_idx,500,utils.word_idx])
-
-net.train(ds,100)
-
-lookup = []
-vectors = []
-for x in range(utils.word_idx):
-	word = utils.inv_vocab[x]
-	net.forward(encode(word))
-	vectors.append(asarray(net.h))
-	lookup.append(word)
-
-for z in range(10):
-	dist = 1000
-	idx = 0
-	w = vectors[25+z]
+def test_nn():
+	ds = load_words_data('../data/ptb.train.short.txt',gpu=True)
+	net = nn([utils.word_idx,500,utils.word_idx])
+	net.train(ds,100)
+	lookup = []
+	vectors = []
 	for x in range(utils.word_idx):
-		if x is not 25+z:
-			if euc(w[0],vectors[x][0]) < dist:
-				print('New Best:', lookup[x])
-				dist = euc(w[0],vectors[x][0])
-				idx = x
-	print('Closest to',lookup[25+z],'is',lookup[idx])
+		word = utils.inv_vocab[x]
+		net.forward(encode(word))
+		vectors.append(asarray(net.h))
+		lookup.append(word)
+	for z in range(10):
+		dist = 1000
+		idx = 0
+		w = vectors[25+z]
+		for x in range(utils.word_idx):
+			if x is not 25+z:
+				if euc(w[0],vectors[x][0]) < dist:
+					print('New Best:', lookup[x])
+					dist = euc(w[0],vectors[x][0])
+					idx = x
+		print('Closest to',lookup[25+z],'is',lookup[idx])
 
+	lpath = open('lookup.pickle','w')
+	vpath = open('vectors.pickle','w')
 
-lpath = open('lookup.pickle','w')
-vpath = open('vectors.pickle','w')
-
-pickle.dump(lookup,lpath)
-pickle.dump(vectors,vpath)
-
-
-
+	pickle.dump(lookup,lpath)
+	pickle.dump(vectors,vpath)

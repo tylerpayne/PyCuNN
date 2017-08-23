@@ -7,8 +7,6 @@ import gc
 import pickle
 from PyCuNN import *
 
-
-
 def init_weights(n,gpu=True):
 	w=None
 	if gpu is True:
@@ -174,7 +172,7 @@ def encode(word,gpu=True):
 				return x
 	else:
 		return word
-	
+
 
 def decode(arr):
 	if not isinstance(arr,basestring):
@@ -185,4 +183,3 @@ def decode(arr):
 			return inv_vocab[index]
 	else:
 		return arr
-
