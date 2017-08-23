@@ -9,6 +9,7 @@
 *.obj
 *.lib
 *.exp
+*.pyc
 
 # Packages #
 ############
